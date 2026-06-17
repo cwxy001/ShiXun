@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_add %}新增瞭望数据源{% else %}编辑瞭望数据源{% end %}{% end %}
+
+{% block content %}
+<div class="page-header">
+    <h2>
+        {% if is_add %}<i class="fas fa-plus me-2" style="color:#22c55e;"></i>新增瞭望数据源
+        {% else %}<i class="fas fa-edit me-2" style="color:#4a6cf7;"></i>编辑瞭望数据源{% end %}
+    </h2>
+    <p>{% if is_add %}添加新的智能数据采集规则{% else %}修改采集规则配置{% end %}</p>
+</div>
+
+<!-- 占位符提示 -->
+<div style="background:linear-gradient(135deg, #eff6ff, #e0f2fe); border:1px solid #bae6fd; border-radius:10px; padding:14px 20px; margin-bottom:20px; font-size:13px; color:#0369a1;">
+    <i class="fas fa-lightbulb" style="margin-right:8px; color:#0284c7;"></i>
+    <strong>占位符：</strong>URL 中可使用 <code style="background:#dbeafe; padding:1px 6px; border-radius:3px;">{关键词}</code> 作为搜索词占位符，
+    <code style="background:#dbeafe; padding:1px 6px; border-radius:3px;">{pn}</code> 作为分页步进占位符。
+</div>
+
+<div style="max-width:800px;">
+    <form method="post" action="{% if is_add %}/admin/watch-source/add{% else %}/admin/watch-source/edit{% end %}" style="background:#fff; border-radius:10px; padding:28px; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+        {% if not is_add %}<input type="hidden" name="id" value="{{ source['id'] }}">{% end %}
+
+        <!-- 基本信息 -->
+        <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">
+                数据源名称 <span style="color:#ef4444;">*</span>
+            </label>
+            <input type="text" name="name" value="{{ source['name'] if source else '' }}"
+                   placeholder="例如：百度新闻搜索" required
+                   style="width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:14px; outline:none; transition: border-color 0.2s;"
+                   onfocus="this.style.borderColor='#4a6cf7'; this.style.boxShadow='0 0 0 3px rgba(74,108,247,0.1)';"
+                   onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+        </div>
+
+        <!-- 请求方法 -->
+        <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">请求方法</label>
+            <select name="method" style="width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:14px; outline:none; background:#fff;"
+                    onfocus="this.style.borderColor='#4a6cf7'; this.style.boxShadow='0 0 0 3px rgba(74,108,247,0.1)';"
+                    onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+                <option value="GET"{% if not source or source['method']=='GET' %} selected{% end %}>GET</option>
+                <option value="POST"{% if source and source['method']=='POST' %} selected{% end %}>POST</option>
+            </select>
+        </div>
+
+        <!-- 采集 URL -->
+        <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">
+                采集 URL 模板 <span style="color:#ef4444;">*</span>
+            </label>
+            <input type="text" name="url_template" value="{{ source['url_template'] if source else '' }}"
+                   placeholder="例如：https://www.baidu.com/s?rt=1&tn=news&word={关键词}&pn={pn}"
+                   required
+                   style="width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:14px; outline:none; font-family:'SF Mono','Fira Code',monospace; transition: border-color 0.2s;"
+                   onfocus="this.style.borderColor='#4a6cf7'; this.style.boxShadow='0 0 0 3px rgba(74,108,247,0.1)';"
+                   onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+            <div style="font-size:12px; color:#94a3b8; margin-top:8px; line-height:1.8;">
+                <strong>占位符规则：</strong><br>
+                <code style="background:#f1f5f9; padding:1px 6px; border-radius:3px;">{关键词}</code> &mdash; 搜索关键词占位，如"西华师范大学"<br>
+                <code style="background:#f1f5f9; padding:1px 6px; border-radius:3px;">{pn}</code> &mdash; 分页步进占位（pn=0 第一页，pn=10 第二页，pn=20 第三页）
+            </div>
+        </div>
+
+        <!-- Request Headers -->
+        <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">
+                Request Headers <span style="color:#94a3b8; font-weight:400;">（JSON 格式）</span>
+            </label>
+            <textarea name="headers" rows="7"
+                      placeholder='{"User-Agent": "Mozilla/5.0 ...", "Accept": "*/*"}'
+                      style="width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:12px 14px; font-size:13px; outline:none; font-family:'SF Mono','Fira Code',monospace; resize:vertical; min-height:120px; line-height:1.6; transition: border-color 0.2s;"
+                      onfocus="this.style.borderColor='#4a6cf7'; this.style.boxShadow='0 0 0 3px rgba(74,108,247,0.1)';"
+                      onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">{{ source['headers'] if source else '{"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html,*/*;q=0.8", "Accept-Language": "zh-CN,zh;q=0.9"}' }}</textarea>
+            <div style="font-size:12px; color:#94a3b8; margin-top:4px;">模拟浏览器请求头，用于规避反爬。必须以 JSON 格式填写。</div>
+        </div>
+
+        <!-- 代理 -->
+        <div style="margin-bottom:20px;">
+            <label style="display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px;">
+                代理地址 <span style="color:#94a3b8; font-weight:400;">（可选）</span>
+            </label>
+            <input type="text" name="proxy" value="{{ source['proxy'] if source else '' }}"
+                   placeholder="例如：http://127.0.0.1:7890"
+                   style="width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:14px; outline:none; font-family:'SF Mono','Fira Code',monospace; transition: border-color 0.2s;"
+                   onfocus="this.style.borderColor='#4a6cf7'; this.style.boxShadow='0 0 0 3px rgba(74,108,247,0.1)';"
+                   onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';">
+        </div>
+
+        <!-- 分页开关 -->
+        <div style="background:#f8fafc; border-radius:10px; padding:14px 20px; margin-bottom:20px; display:flex; align-items:center; gap:12px;">
+            <div style="flex:1;">
+                <div style="font-size:14px; font-weight:600; color:#334155;">分页采集</div>
+                <div style="font-size:12px; color:#94a3b8; margin-top:2px;">开启后支持 {pn} 占位符分页步进</div>
+            </div>
+            <label style="position:relative; width:48px; height:26px; flex-shrink:0; cursor:pointer;">
+                <input type="checkbox" name="enable_pagination" value="1" style="display:none;"
+                       {% if source and source['enable_pagination']==1 %} checked{% end %}>
+                <span style="position:absolute; top:0; left:0; right:0; bottom:0; background:#cbd5e1; border-radius:13px; transition:all 0.3s;"></span>
+                <span style="position:absolute; top:3px; left:3px; width:20px; height:20px; background:#fff; border-radius:50%; transition:all 0.3s; box-shadow:0 1px 3px rgba(0,0,0,0.15);"></span>
+            </label>
+        </div>
+
+        <style>
+            /* 开关选中状态 */
+            input[name="enable_pagination"]:checked ~ span:first-of-type { background:linear-gradient(135deg, #4a6cf7, #6366f1) !important; }
+            input[name="enable_pagination"]:checked ~ span:last-of-type { transform:translateX(22px); }
+        </style>
+
+        <!-- 操作按钮 -->
+        <div style="display:flex; gap:12px; justify-content:flex-end; padding-top:16px; border-top:1px solid #f1f5f9;">
+            <a href="/admin/watch-sources" style="display:inline-flex; align-items:center; gap:6px; padding:9px 22px; border:1px solid #e2e8f0; border-radius:8px; color:#64748b; font-size:14px; font-weight:600; text-decoration:none; background:#fff; transition:all 0.15s;" onmouseover="this.style.background='#f8fafc';" onmouseout="this.style.background='#fff';">取消</a>
+            <button type="submit" style="display:inline-flex; align-items:center; gap:6px; padding:9px 28px; border:none; border-radius:8px; background:linear-gradient(135deg, #4a6cf7, #6366f1); color:#fff; font-size:14px; font-weight:600; cursor:pointer; box-shadow:0 4px 14px rgba(74,108,247,0.35); transition:all 0.3s;"
+                    onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 20px rgba(74,108,247,0.45)';"
+                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 14px rgba(74,108,247,0.35)';">
+                <i class="fas fa-{% if is_add %}plus{% else %}check{% end %}"></i> {% if is_add %}新增{% else %}保存{% end %}
+            </button>
+        </div>
+    </form>
+</div>
+{% end %}

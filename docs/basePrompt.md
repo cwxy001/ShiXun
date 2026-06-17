@@ -45,15 +45,21 @@ IOIQ-System/
 │  │  ├─ __init__.py       # 控制器包标识
 │  │  ├─ admin_auth.py     # 后台认证控制器（登录/登出/主页）
 │  │  ├─ admin_manage.py   # 后台管理控制器（功能/角色/用户 CRUD）
+│  │  ├─ model_engine.py   # 模型引擎控制器（CRUD + SSE 流式对话测试）
+│  │  ├─ watch_source.py   # 瞭望数据源控制器（采集规则 CRUD）
+│  │  ├─ watch_collect.py  # 瞭望采集控制器（采集执行 / SSE 流式 / 保存）
 │  │  ├─ base.py           # 基础控制器（预留）
 │  │  ├─ home.py           # 首页控制器（预留）
 │  │  └─ auth.py           # 认证控制器（预留）
 │  ├─ models/              # 模型层（M）- 数据与业务逻辑
 │  │  ├─ __init__.py       # 模型包标识
-│  │  ├─ db.py             # 数据库连接管理 & 表初始化 & 种子数据（SQLite3，4张表）
+│  │  ├─ db.py             # 数据库连接管理 & 表初始化 & 种子数据（SQLite3，8张表）
 │  │  ├─ user.py           # 用户仓储类（CRUD、密码哈希验证）
 │  │  ├─ role.py           # 角色仓储类（CRUD、分页、功能权限分配）
-│  │  └─ function.py       # 功能/菜单仓储类（CRUD、分页、树形结构）
+│  │  ├─ function.py       # 功能/菜单仓储类（CRUD、分页、树形结构）
+│  │  ├─ model_engine.py   # 模型引擎仓储类（CRUD、Token 统计、默认模型管理）
+│  │  ├─ watch_source.py   # 瞭望数据源仓储类（CRUD、分页搜索）
+│  │  └─ watch_result.py   # 瞭望采集结果仓储类（批量保存、分页搜索）
 │  ├─ templates/           # 视图层（V）- HTML 模板
 │  │  ├─ admin/            # 后台管理页面
 │  │  │  ├─ base.html      # 后台基础布局模板（ZUI 上/左/右布局）
@@ -64,7 +70,13 @@ IOIQ-System/
 │  │  │  ├─ role_list.html # 角色管理列表页
 │  │  │  ├─ role_edit.html # 角色编辑页（含二级联动功能权限树）
 │  │  │  ├─ user_list.html # 用户管理列表页
-│  │  │  └─ user_edit.html # 用户新增/编辑页
+│  │  │  ├─ user_edit.html # 用户新增/编辑页
+│  │  │  ├─ model_list.html # 模型引擎列表页（橱窗卡片/三列/科技风）
+│  │  │  ├─ model_edit.html # 模型新增/编辑表单（OPENAI-API配置）
+│  │  │  └─ model_chat.html # 模型对话测试页（SSE流式+Think开关）
+│  │  │  ├─ watch_source_list.html  # 瞭望数据源列表页
+│  │  │  ├─ watch_source_edit.html  # 瞭望数据源新增/编辑页
+│  │  │  └─ watch_collect.html      # 瞭望采集页（独立科技风/搜索引擎式交互）
 │  │  └─ web/              # 前台用户页面（预留）
 │  │     ├─ base.html      # 基础模板（预留）
 │  │     ├─ index.html     # 首页（预留）
@@ -103,15 +115,24 @@ IOIQ-System/
   - `user.py`：`UserRepository` 类，提供用户创建、查询、密码验证等数据操作；密码采用 PBKDF2-HMAC-SHA256 + 随机 salt 加密
   - `role.py`：`RoleRepository` 类，角色 CRUD + 分页搜索 + 功能权限分配（二级联动）
   - `function.py`：`FunctionRepository` 类，功能/菜单 CRUD + 分页搜索 + 树形结构获取 + 级联删除
+  - `model_engine.py`：`ModelEngineRepository` 类，模型引擎 CRUD + 分页搜索 + 默认模型管理 + Token 统计
+  - `watch_source.py`：`WatchSourceRepository` 类，瞭望数据源 CRUD + 分页搜索
+  - `watch_result.py`：`WatchResultRepository` 类，采集结果批量保存 + 分页搜索
 - **View（视图层）** — `app/templates/`
   - 后台页面（`admin/`）：登录页、基础布局模板（ZUI 上/左/右布局）、控制台首页
   - **功能管理**：`func_list.html`（列表+分页+搜索）、`func_edit.html`（新增/编辑表单）
   - **角色管理**：`role_list.html`（列表+分页+搜索）、`role_edit.html`（编辑含二级联动功能权限树）
   - **用户管理**：`user_list.html`（列表+分页+搜索）、`user_edit.html`（新增/编辑表单）
+  - **模型引擎**：`model_list.html`（三列橱窗卡片/科技风/Token 可视化）、`model_edit.html`（OPENAI-API 配置表单/SSE 流式开关/Think 开关）、`model_chat.html`（对话测试/SSE 流式聊天/Think 模式面板）
+  - **瞭望数据源管理**：`watch_source_list.html`（表格列表+分页+搜索）、`watch_source_edit.html`（采集规则配置/请求头JSON编辑器/分页开关）
+  - **瞭望采集**：`watch_collect.html`（独立深色科技风页面 / 中央搜索框 / 采集源开关面板 / 参数配置联动 / 结果橱窗3列 / 多选全选 / 一键保存）
   - 前台页面（`web/`）：预留，待后续开发
 - **Controller（控制层）** — `app/controllers/`
   - `admin_auth.py`：后台认证控制器（登录/登出/主页）
   - `admin_manage.py`：后台管理控制器（功能/角色/用户三大模块的完整 CRUD）
+  - `model_engine.py`：模型引擎控制器（列表/新增/编辑/删除/设默认 + SSE 流式对话测试）
+  - `watch_source.py`：瞭望数据源控制器（列表/新增/编辑/删除 + 占位符URL配置）
+  - `watch_collect.py`：瞭望采集控制器（采集主页面 + 数据源JSON接口 + SSE 流式采集执行 + 批量保存）
 
 ### 数据库设计
 | 表名 | 说明 | 关键字段 |
@@ -120,6 +141,9 @@ IOIQ-System/
 | `roles` | 角色表 | id, name, description, is_system(系统内置标识), created_at |
 | `functions` | 功能/菜单表 | id, parent_id(上级ID,0=顶级), name, code(唯一编码), icon, path, sort_order, status |
 | `role_functions` | 角色-功能关联表 | role_id, function_id (联合唯一，实现二级联动) |
+| `model_engines` | 模型引擎表 | id, name, provider, api_base, api_key, model_name, model_type(text/multimodal/vision/vector), is_default, temperature, max_tokens, system_prompt, enable_stream, enable_think, total_tokens, status |
+| `watch_sources` | 瞭望数据源表 | id, name, url_template(含{关键词}/{pn}占位), method, headers(JSON), proxy, enable_pagination, status |
+| `watch_results` | 瞭望采集结果表 | id, source_id, source_name, keyword, title, url, snippet, raw_html, page_num, collected_at |
 
 ### 主入口（app.py）
 - 使用 `tornado.web.Application` 创建 Web 应用实例
@@ -148,6 +172,21 @@ IOIQ-System/
 | `/admin/user/add` | UserAddHandler(GET/POST) | 新增用户 |
 | `/admin/user/edit` | UserEditHandler(GET/POST) | 编辑用户 |
 | `/admin/user/delete` | UserDeleteHandler(POST) | 删除用户（admin不可删） |
+| `/admin/models` | ModelListHandler | 模型引擎列表（三列卡片/6条每页） |
+| `/admin/model/add` | ModelAddHandler(GET/POST) | 新增模型引擎 |
+| `/admin/model/edit` | ModelEditHandler(GET/POST) | 编辑模型引擎 |
+| `/admin/model/delete` | ModelDeleteHandler(POST) | 删除模型引擎 |
+| `/admin/model/set-default` | ModelSetDefaultHandler(POST) | 设为默认模型 |
+| `/admin/model/chat` | ModelChatHandler(GET) | 模型对话测试页 |
+| `/admin/model/chat/sse` | ModelChatSSEHandler(POST) | SSE 流式对话接口 |
+| `/admin/watch-sources` | WatchSourceListHandler | 瞭望数据源列表 |
+| `/admin/watch-source/add` | WatchSourceAddHandler(GET/POST) | 新增数据源 |
+| `/admin/watch-source/edit` | WatchSourceEditHandler(GET/POST) | 编辑数据源 |
+| `/admin/watch-source/delete` | WatchSourceDeleteHandler(POST) | 删除数据源 |
+| `/admin/watch-collect` | WatchCollectPageHandler | 瞭望采集主页面 |
+| `/admin/watch-collect/sources` | WatchCollectSourcesHandler(GET) | 数据源列表JSON |
+| `/admin/watch-collect/fetch` | WatchCollectFetchHandler(POST) | SSE 流式采集执行 |
+| `/admin/watch-collect/save` | WatchCollectSaveHandler(POST) | 保存选中结果 |
 
 ### 数据流
 ```
@@ -201,6 +240,9 @@ python test/testCase1.py
 - **功能管理模块**：CRUD + 分页(20条/页) + 模糊搜索 + 级联删除 + 树形菜单展示
 - **角色管理模块**：CRUD + 分页(20条/页) + 模糊搜索 + 二级联动功能权限分配（系统内置角色不可删除修改）
 - **用户管理模块**：CRUD + 分页(20条/页) + 模糊搜索 + 角色分配（admin 不可删除）
+- **模型引擎模块**：CRUD + 分页(6条/页) + 模糊搜索 + 三列橱窗卡片布局(科技风格) + OPENAI-API范式配置 + Token可视化统计 + SSE流式对话测试 + Think模式 + 默认模型管理
+- **瞭望数据源模块**：CRUD + 分页(20条/页) + 模糊搜索 + URL占位符配置({关键词}{pn}) + Request Headers JSON编辑器 + 分页采集开关 + 代理配置
+- **瞭望采集模块**：独立深色科技风页面（非ZUI布局）+ 中央搜索框 + 采集源动态开关面板 + 参数配置联动(pages/pn_step/URL预览) + SSE流式采集 + 结果3列橱窗 + 多选/全选 + 一键保存到数据库
 - 默认管理员账号：**admin / 123456**
 - 默认角色：超级管理员、普通管理员、普通用户（含预置功能权限）
 - 前台页面（`web/`）预留待后续开发

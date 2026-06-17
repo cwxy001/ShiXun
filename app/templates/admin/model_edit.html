@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '新增模型' if is_add else '编辑模型' }}{% end %}
+
+{% block head %}
+<style>
+    .form-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        padding: 32px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .form-section {
+        margin-bottom: 28px;
+    }
+    .form-section-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f1f5f9;
+    }
+    .form-section-title i {
+        color: #4a6cf7;
+        font-size: 18px;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-bottom: 16px;
+    }
+    .form-row.full {
+        grid-template-columns: 1fr;
+    }
+    .form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 6px;
+    }
+    .form-group label .required {
+        color: #ef4444;
+        margin-left: 2px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #0f172a;
+        outline: none;
+        transition: all 0.2s;
+        background: #fff;
+        font-family: inherit;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        border-color: #4a6cf7;
+        box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.1);
+    }
+    .form-group textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+    .form-group .hint {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-top: 4px;
+    }
+
+    /* 开关控件 */
+    .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        background: #f8fafc;
+        border-radius: 10px;
+        margin-bottom: 12px;
+    }
+    .toggle-row .toggle-label {
+        flex: 1;
+        font-size: 14px;
+        font-weight: 600;
+        color: #334155;
+    }
+    .toggle-row .toggle-desc {
+        font-size: 12px;
+        color: #94a3b8;
+        font-weight: 400;
+    }
+    .toggle-switch {
+        position: relative;
+        width: 48px; height: 26px;
+        flex-shrink: 0;
+    }
+    .toggle-switch input { display: none; }
+    .toggle-slider {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: #cbd5e1;
+        border-radius: 13px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .toggle-slider::before {
+        content: '';
+        position: absolute;
+        top: 3px; left: 3px;
+        width: 20px; height: 20px;
+        background: #fff;
+        border-radius: 50%;
+        transition: all 0.3s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .toggle-switch input:checked + .toggle-slider {
+        background: linear-gradient(135deg, #4a6cf7, #6366f1);
+    }
+    .toggle-switch input:checked + .toggle-slider::before {
+        transform: translateX(22px);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        padding-top: 20px;
+        border-top: 1px solid #f1f5f9;
+    }
+    .btn-submit {
+        padding: 10px 28px;
+        background: linear-gradient(135deg, #4a6cf7, #6366f1);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(74, 108, 247, 0.35);
+    }
+    .btn-submit:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(74, 108, 247, 0.45);
+    }
+    .btn-cancel {
+        padding: 10px 24px;
+        background: #fff;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+    }
+    .btn-cancel:hover {
+        background: #f8fafc;
+    }
+</style>
+{% end %}
+
+{% block content %}
+<div class="form-container">
+    <h2 style="font-size:20px;font-weight:700;color:#0f172a;margin-bottom:24px;">
+        <i class="fas fa-microchip" style="color:#4a6cf7;margin-right:8px;"></i>
+        {{ '新增模型引擎' if is_add else '编辑模型引擎' }}
+    </h2>
+
+    <form method="post" action="/admin/model/{{ 'add' if is_add else 'edit' }}">
+        {% if not is_add %}<input type="hidden" name="id" value="{{ model['id'] }}">{% end %}
+
+        <!-- 基本信息 -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="fas fa-info-circle"></i>基本信息</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>模型名称 <span class="required">*</span></label>
+                    <input type="text" name="name" placeholder="例如: Qwen 3.5 Flash" value="{{ model['name'] if model else '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label>提供者</label>
+                    <select name="provider">
+                        <option value="openai"{% if not model or model['provider']=='openai' %} selected{% end %}>OpenAI 兼容</option>
+                        <option value="azure"{% if model and model['provider']=='azure' %} selected{% end %}>Azure OpenAI</option>
+                        <option value="custom"{% if model and model['provider']=='custom' %} selected{% end %}>自定义</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row full">
+                <div class="form-group">
+                    <label>API Base URL <span class="required">*</span></label>
+                    <input type="text" name="api_base" placeholder="https://api.openai.com/v1" value="{{ model['api_base'] if model else '' }}" required>
+                    <div class="hint">符合 OpenAI-API 范式的服务端点地址</div>
+                </div>
+            </div>
+            <div class="form-row full">
+                <div class="form-group">
+                    <label>API Key <span class="required">*</span></label>
+                    <input type="text" name="api_key" placeholder="sk-..." value="{{ model['api_key'] if model else '' }}">
+                    <div class="hint">模型服务的 API 密钥</div>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>模型标识 <span class="required">*</span></label>
+                    <input type="text" name="model_name" placeholder="qwen3.5-flash" value="{{ model['model_name'] if model else '' }}" required>
+                    <div class="hint">调用 API 时使用的 model 参数值</div>
+                </div>
+                <div class="form-group">
+                    <label>模型类型</label>
+                    <select name="model_type">
+                        <option value="text"{% if not model or model['model_type']=='text' %} selected{% end %}>文字模型</option>
+                        <option value="multimodal"{% if model and model['model_type']=='multimodal' %} selected{% end %}>多模态模型</option>
+                        <option value="vision"{% if model and model['model_type']=='vision' %} selected{% end %}>视觉模型</option>
+                        <option value="vector"{% if model and model['model_type']=='vector' %} selected{% end %}>向量模型</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模型参数 -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="fas fa-sliders-h"></i>模型参数</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>温度 (Temperature)</label>
+                    <input type="number" name="temperature" step="0.01" min="0" max="2" value="{{ model['temperature'] if model else '0.7' }}">
+                    <div class="hint">控制随机性，0=确定，2=随机 (默认0.7)</div>
+                </div>
+                <div class="form-group">
+                    <label>最大 Token 数</label>
+                    <input type="number" name="max_tokens" min="1" max="128000" value="{{ model['max_tokens'] if model else '2048' }}">
+                    <div class="hint">单次请求最大 Token 数 (默认2048)</div>
+                </div>
+            </div>
+            <div class="form-row full">
+                <div class="form-group">
+                    <label>系统提示 (System Prompt)</label>
+                    <textarea name="system_prompt" placeholder="可选的系统级别指令，例如：'你是一个有用的AI助手...'">{{ model['system_prompt'] if model else '' }}</textarea>
+                    <div class="hint">设置模型的默认行为、角色和回答风格</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 高级选项 -->
+        <div class="form-section">
+            <div class="form-section-title"><i class="fas fa-cog"></i>高级选项</div>
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    SSE 流式响应 <span class="toggle-desc">开启后对话测试以流式方式逐字输出</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" name="enable_stream" value="1"{% if is_add or (model and model['enable_stream']==1) %} checked{% end %}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div class="toggle-label">
+                    Think 模式 <span class="toggle-desc">开启后模型在回答前先进行思考（需要模型支持）</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" name="enable_think" value="1"{% if model and model['enable_think']==1 %} checked{% end %}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="/admin/models" class="btn-cancel"><i class="fas fa-arrow-left" style="margin-right:6px;"></i>返回列表</a>
+            <button type="submit" class="btn-submit">
+                <i class="fas fa-{{ 'plus' if is_add else 'check' }}" style="margin-right:6px;"></i>
+                {{ '新增模型' if is_add else '保存修改' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% end %}

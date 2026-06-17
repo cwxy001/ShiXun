@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block title %}模型引擎{% end %}
+
+{% block head %}
+<style>
+    .page-title-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+    }
+    .page-title-bar h2 {
+        font-size: 22px;
+        font-weight: 700;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .page-title-bar h2 i {
+        font-size: 26px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .btn-add {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 22px;
+        background: linear-gradient(135deg, #4a6cf7, #6366f1);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        box-shadow: 0 4px 14px rgba(74, 108, 247, 0.35);
+        transition: all 0.3s ease;
+    }
+    .btn-add:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(74, 108, 247, 0.45);
+        color: #fff;
+    }
+
+    /* 搜索栏 */
+    .search-bar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .search-bar input {
+        flex: 1;
+        max-width: 400px;
+        padding: 9px 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
+        background: #fff;
+    }
+    .search-bar input:focus {
+        border-color: #4a6cf7;
+        box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.1);
+    }
+    .search-bar button {
+        padding: 9px 18px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        color: #475569;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .search-bar button:hover { background: #e2e8f0; }
+
+    /* 三列卡片网格 */
+    .model-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+
+    /* 科技感卡片 */
+    .model-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+    .model-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 24px 48px -12px rgba(74, 108, 247, 0.2), 0 0 0 1px rgba(74, 108, 247, 0.15);
+        border-color: #c7d2fe;
+    }
+    .model-card.default {
+        border-color: #4a6cf7;
+        box-shadow: 0 0 0 1px rgba(74, 108, 247, 0.2);
+    }
+    .model-card.default::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #4a6cf7, #6366f1, #8b5cf6);
+    }
+
+    /* 卡片头部 */
+    .card-header {
+        padding: 20px 20px 14px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+    }
+    .card-icon {
+        width: 48px; height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: #38bdf8;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3);
+    }
+    .card-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .badge-default {
+        background: #ede9fe;
+        color: #7c3aed;
+    }
+    .badge-normal {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+    .card-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 10px 0 4px;
+    }
+    .card-subtitle {
+        font-size: 13px;
+        color: #94a3b8;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        word-break: break-all;
+    }
+
+    /* 卡片属性区 */
+    .card-props {
+        padding: 0 20px 16px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    .prop-item {
+        display: flex;
+        flex-direction: column;
+    }
+    .prop-label {
+        font-size: 11px;
+        color: #94a3b8;
+        font-weight: 500;
+    }
+    .prop-value {
+        font-size: 13px;
+        color: #334155;
+        font-weight: 600;
+    }
+
+    /* Token 统计条 */
+    .token-bar-wrap {
+        margin: 0 20px 14px;
+        background: #f1f5f9;
+        border-radius: 8px;
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .token-bar-wrap i {
+        color: #38bdf8;
+        font-size: 16px;
+    }
+    .token-bar-inner {
+        flex: 1;
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .token-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #38bdf8, #818cf8);
+        border-radius: 3px;
+        transition: width 0.6s ease;
+    }
+    .token-text {
+        font-size: 12px;
+        color: #0f172a;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    /* 卡片底部操作 */
+    .card-actions {
+        display: flex;
+        border-top: 1px solid #f1f5f9;
+        padding: 12px 20px;
+        gap: 8px;
+    }
+    .card-actions a, .card-actions form {
+        flex: 1;
+    }
+    .btn-card {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        width: 100%;
+        padding: 8px 0;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        color: #475569;
+        transition: all 0.2s;
+    }
+    .btn-card:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+    .btn-card.primary {
+        background: #4a6cf7;
+        border-color: #4a6cf7;
+        color: #fff;
+    }
+    .btn-card.primary:hover {
+        background: #3b5de7;
+    }
+    .btn-card.danger {
+        color: #ef4444;
+    }
+    .btn-card.danger:hover {
+        background: #fef2f2;
+        border-color: #fecaca;
+    }
+
+    /* 分页 */
+    .pagination-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        margin-top: 28px;
+    }
+    .pagination-wrap a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 36px; height: 36px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+    .pagination-wrap a:hover { background: #f1f5f9; }
+    .pagination-wrap a.active {
+        background: linear-gradient(135deg, #4a6cf7, #6366f1);
+        border-color: transparent;
+        color: #fff;
+    }
+    .pagination-wrap span { color: #94a3b8; font-size: 13px; }
+
+    /* 空状态 */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #94a3b8;
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        display: block;
+        background: linear-gradient(135deg, #cbd5e1, #94a3b8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .empty-state p { font-size: 15px; color: #64748b; }
+
+    /* 科技感装饰 */
+    .tech-grid-bg {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        opacity: 0.03;
+        pointer-events: none;
+        background-image:
+            linear-gradient(rgba(56, 189, 248, 0.3) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(56, 189, 248, 0.3) 1px, transparent 1px);
+        background-size: 20px 20px;
+    }
+</style>
+{% end %}
+
+{% block content %}
+<div style="position:relative;">
+<div class="tech-grid-bg"></div>
+<div class="page-title-bar">
+    <h2><i class="fas fa-microchip"></i>模型引擎</h2>
+    <a href="/admin/model/add" class="btn-add"><i class="fas fa-plus"></i>新增模型</a>
+</div>
+
+<form class="search-bar" method="get" action="/admin/models">
+    <input type="text" name="keyword" placeholder="搜索模型名称、提供者..." value="{{ keyword }}">
+    <button type="submit"><i class="fas fa-search"></i> 搜索</button>
+    {% if keyword %}<a href="/admin/models" style="display:inline-flex;align-items:center;gap:4px;padding:9px 14px;color:#94a3b8;text-decoration:none;font-size:13px;"><i class="fas fa-times"></i>清除</a>{% end %}
+</form>
+
+{% if list and len(list) > 0 %}
+<div class="model-grid">
+    {% for m in list %}
+    <div class="model-card{% if m['is_default']==1 %} default{% end %}">
+        <div class="card-header">
+            <div class="card-icon">
+                {% if m['model_type'] == 'text' %}<i class="fas fa-font"></i>
+                {% elif m['model_type'] == 'multimodal' %}<i class="fas fa-images"></i>
+                {% elif m['model_type'] == 'vision' %}<i class="fas fa-eye"></i>
+                {% elif m['model_type'] == 'vector' %}<i class="fas fa-cube"></i>
+                {% else %}<i class="fas fa-robot"></i>
+                {% end %}
+            </div>
+            <div style="flex:1; margin-left:14px;">
+                <div class="card-title">{{ m['name'] }}</div>
+                <div class="card-subtitle">{{ m['model_name'] }}</div>
+                <div style="margin-top:6px;">
+                    <span class="card-badge {% if m['is_default']==1 %}badge-default{% else %}badge-normal{% end %}">
+                        {% if m['is_default']==1 %}<i class="fas fa-star"></i> 默认{% else %}{{ m['provider'] }}{% end %}
+                    </span>
+                    <span class="card-badge badge-normal" style="margin-left:4px;">{{ m['model_type'] }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-props">
+            <div class="prop-item">
+                <span class="prop-label">温度</span>
+                <span class="prop-value">{{ m['temperature'] }}</span>
+            </div>
+            <div class="prop-item">
+                <span class="prop-label">最大 Token</span>
+                <span class="prop-value">{{ m['max_tokens'] }}</span>
+            </div>
+            <div class="prop-item">
+                <span class="prop-label">流式</span>
+                <span class="prop-value">{% if m['enable_stream']==1 %}<i class="fas fa-check-circle" style="color:#22c55e;"></i> 开启{% else %}<i class="fas fa-times-circle" style="color:#ef4444;"></i> 关闭{% end %}</span>
+            </div>
+            <div class="prop-item">
+                <span class="prop-label">Think</span>
+                <span class="prop-value">{% if m['enable_think']==1 %}<i class="fas fa-check-circle" style="color:#22c55e;"></i> 开启{% else %}<i class="fas fa-times-circle" style="color:#ef4444;"></i> 关闭{% end %}</span>
+            </div>
+        </div>
+
+        <div class="token-bar-wrap">
+            <i class="fas fa-bolt"></i>
+            <div class="token-bar-inner">
+                <div class="token-bar-fill" style="width: {% if m['total_tokens'] > 1000000 %}100{% else %}{{ m['total_tokens'] / 10000 }}{% end %}%;"></div>
+            </div>
+            <span class="token-text">{{ m['total_tokens'] }} tk</span>
+        </div>
+
+        <div class="card-actions">
+            <a href="/admin/model/chat?id={{ m['id'] }}" class="btn-card primary"><i class="fas fa-comment-dots"></i>对话测试</a>
+            <a href="/admin/model/edit?id={{ m['id'] }}" class="btn-card"><i class="fas fa-pen"></i>编辑</a>
+            {% if m['is_default']!=1 %}
+            <form action="/admin/model/set-default" method="post" style="flex:1;">
+                <input type="hidden" name="id" value="{{ m['id'] }}">
+                <button type="submit" class="btn-card"><i class="fas fa-star"></i>默认</button>
+            </form>
+            {% end %}
+            <form action="/admin/model/delete" method="post" style="flex:1;" onsubmit="return confirm('确认删除该模型引擎？');">
+                <input type="hidden" name="id" value="{{ m['id'] }}">
+                <button type="submit" class="btn-card danger"><i class="fas fa-trash"></i>删除</button>
+            </form>
+        </div>
+    </div>
+    {% end %}
+</div>
+
+<div class="pagination-wrap">
+    {% if page > 1 %}<a href="/admin/models?page={{ page - 1 }}{% if keyword %}&keyword={{ keyword }}{% end %}"><i class="fas fa-chevron-left"></i></a>{% end %}
+    {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}<a class="active" href="#">{{ p }}</a>
+        {% else %}<a href="/admin/models?page={{ p }}{% if keyword %}&keyword={{ keyword }}{% end %}">{{ p }}</a>
+        {% end %}
+    {% end %}
+    {% if page < total_pages %}<a href="/admin/models?page={{ page + 1 }}{% if keyword %}&keyword={{ keyword }}{% end %}"><i class="fas fa-chevron-right"></i></a>{% end %}
+</div>
+
+{% else %}
+<div class="empty-state">
+    <i class="fas fa-microchip"></i>
+    <p>{{ "没有找到匹配的模型引擎" if keyword else "暂无模型引擎，点击上方按钮新增" }}</p>
+</div>
+{% end %}
+</div>
+{% end %}

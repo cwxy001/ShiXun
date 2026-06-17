@@ -15,9 +15,20 @@ from app.controllers.admin_manage import (
     RoleListHandler, RoleAddHandler, RoleEditHandler, RoleDeleteHandler,
     UserListHandler, UserAddHandler, UserEditHandler, UserDeleteHandler,
 )
+from app.controllers.model_engine import (
+    ModelListHandler, ModelAddHandler, ModelEditHandler, ModelDeleteHandler,
+    ModelSetDefaultHandler, ModelChatHandler, ModelChatSSEHandler,
+)
+from app.controllers.watch_source import (
+    WatchSourceListHandler, WatchSourceAddHandler, WatchSourceEditHandler, WatchSourceDeleteHandler,
+)
+from app.controllers.watch_collect import (
+    WatchCollectPageHandler, WatchCollectSourcesHandler,
+    WatchCollectFetchHandler, WatchCollectSaveHandler,
+)
 
 # 数据库初始化 & 种子数据
-from app.models.db import init_db, seed_admin, seed_roles_and_functions
+from app.models.db import init_db, seed_admin, seed_roles_and_functions, seed_model_engines, seed_watch_sources
 
 
 def create_app():
@@ -25,6 +36,8 @@ def create_app():
     init_db()
     seed_admin()
     seed_roles_and_functions()
+    seed_model_engines()
+    seed_watch_sources()
 
     return tornado.web.Application(
         [
@@ -50,6 +63,24 @@ def create_app():
             ("/admin/user/add", UserAddHandler),
             ("/admin/user/edit", UserEditHandler),
             ("/admin/user/delete", UserDeleteHandler),
+            # 模型引擎路由
+            ("/admin/models", ModelListHandler),
+            ("/admin/model/add", ModelAddHandler),
+            ("/admin/model/edit", ModelEditHandler),
+            ("/admin/model/delete", ModelDeleteHandler),
+            ("/admin/model/set-default", ModelSetDefaultHandler),
+            ("/admin/model/chat", ModelChatHandler),
+            ("/admin/model/chat/sse", ModelChatSSEHandler),
+            # 瞭望数据源路由
+            ("/admin/watch-sources", WatchSourceListHandler),
+            ("/admin/watch-source/add", WatchSourceAddHandler),
+            ("/admin/watch-source/edit", WatchSourceEditHandler),
+            ("/admin/watch-source/delete", WatchSourceDeleteHandler),
+            # 瞭望采集路由
+            ("/admin/watch-collect", WatchCollectPageHandler),
+            ("/admin/watch-collect/sources", WatchCollectSourcesHandler),
+            ("/admin/watch-collect/fetch", WatchCollectFetchHandler),
+            ("/admin/watch-collect/save", WatchCollectSaveHandler),
         ],
         # 静态文件配置
         static_path=os.path.join(PROJECT_ROOT, "app", "static"),
