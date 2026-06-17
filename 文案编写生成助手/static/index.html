@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="文案编写生成助手 · 四步生成专业文案" />
+    <title>文案编写生成助手 · 西师姐</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+    <!-- 算法化背景：点矩阵 + 极浅色带 -->
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-gradient" aria-hidden="true"></div>
+
+    <main class="page">
+
+        <!-- 品牌头部 -->
+        <header class="brand">
+            <div class="brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="4" y="4" width="24" height="24" rx="2" />
+                    <line x1="9" y1="12" x2="23" y2="12" />
+                    <line x1="9" y1="16" x2="23" y2="16" stroke-dasharray="2 2" />
+                    <line x1="9" y1="20" x2="18" y2="20" />
+                    <circle cx="21" cy="21" r="1.8" fill="currentColor" stroke="none" />
+                </svg>
+            </div>
+            <div class="brand-text">
+                <h1>文案编写生成助手</h1>
+                <p>西师姐 · 开始 → 关键字 → 主题 → 风格 → 逐章生成</p>
+            </div>
+            <button id="clearBtn" class="brand-action" title="清空对话">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>
+                <span>清空</span>
+            </button>
+        </header>
+
+        <!-- 工作流提示（紧凑可折叠） -->
+        <nav class="workflow" aria-label="四步工作流">
+            <ol>
+                <li><span class="step-n">1</span><span class="step-l">开始</span></li>
+                <li><span class="arrow">→</span></li>
+                <li><span class="step-n">2</span><span class="step-l">关键字</span></li>
+                <li><span class="arrow">→</span></li>
+                <li><span class="step-n">3</span><span class="step-l">选主题</span></li>
+                <li><span class="arrow">→</span></li>
+                <li><span class="step-n">4</span><span class="step-l">风格 & 逐章生成</span></li>
+            </ol>
+        </nav>
+
+        <!-- 对话区 -->
+        <section id="messageList" class="messages" aria-live="polite">
+            <!-- 顶部滚动进度条（细线） -->
+            <div class="scroll-progress" id="scrollProgress"></div>
+
+            <!-- 欢迎消息由 JS 注入，这里留一个占位避免闪烁 -->
+            <article class="msg assistant reveal" style="--d: 0ms;">
+                <div class="msg-avatar" aria-hidden="true">西</div>
+                <div class="msg-content">
+                    <p>你好，我是<strong>西师姐</strong>。</p>
+                    <p>输入 <code>开始</code> 启动四步生成流程，或直接告诉我你的关键词（例如：<em>四川 南充 西华师范大学 软件工程</em>）。</p>
+                </div>
+            </article>
+
+            <!-- 回到顶部按钮 -->
+            <button id="scrollTopBtn" class="scroll-top-btn" aria-label="回到顶部" title="回到顶部">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            </button>
+        </section>
+
+        <!-- 输入区 -->
+        <form id="inputForm" class="composer" autocomplete="off">
+            <textarea
+                id="inputBox"
+                rows="1"
+                placeholder="输入消息 · Enter 发送 · Shift+Enter 换行"
+                aria-label="输入消息"></textarea>
+            <button id="sendBtn" class="send" type="submit" aria-label="发送">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" stroke="none" opacity="0.9"/></svg>
+            </button>
+        </form>
+
+        <!-- 页脚（克制信息） -->
+        <footer class="foot">
+            <span>模型 qwen3.5-flash</span>
+            <span class="dot">·</span>
+            <span>流式输出</span>
+            <span class="dot">·</span>
+            <span>V2.0 精简版</span>
+        </footer>
+
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
