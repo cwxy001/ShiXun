@@ -68,3 +68,7 @@ htmlcov/
 *.bak
 *.backup
 *.old
+
+# Media files
+*.mp4
+*.zip
