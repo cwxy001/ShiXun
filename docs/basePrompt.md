@@ -125,7 +125,7 @@ IOIQ-System/
   - `watch_source.py`：`WatchSourceRepository` 类，瞭望数据源 CRUD + 分页搜索
   - `watch_result.py`：`WatchResultRepository` 类，采集结果批量保存 + 分页搜索
 - **View（视图层）** — `app/templates/`
-  - 后台页面（`admin/`）：登录页、基础布局模板（ZUI 上/左/右布局）、控制台首页
+  - 后台页面（`admin/`）：登录页、基础布局模板（ZUI 上/左/右布局，左侧菜单15项扁平无分组）、控制台首页
   - **功能管理**：`func_list.html`（列表+分页+搜索）、`func_edit.html`（新增/编辑表单）
   - **角色管理**：`role_list.html`（列表+分页+搜索）、`role_edit.html`（编辑含二级联动功能权限树）
   - **用户管理**：`user_list.html`（列表+分页+搜索）、`user_edit.html`（新增/编辑表单）
@@ -134,6 +134,28 @@ IOIQ-System/
   - **瞭望采集**：`watch_collect.html`（独立深色科技风页面 / 中央搜索框 / 采集源开关面板 / 参数配置联动 / 结果橱窗3列 / 多选全选 / 一键保存）
   - **数据仓库**：`data_warehouse.html`（采集结果列表 + 关键词/时间/来源筛选 + 全选批量删除 + AI深度采集入口(实时进度面板/SSE流式/统计) + 深度采集状态标识 + 分页20条/页）、`deep_detail.html`（源数据信息/AI分析摘要/提取正文/采集日志）
   - 前台页面（`web/`）：预留，待后续开发
+
+### 左侧菜单结构（admin/base.html）
+菜单项按以下顺序扁平排列，无分组标题：
+
+| 序号 | 菜单名称 | 路由 | current_page 值 | 图标 |
+|------|---------|------|-----------------|------|
+| 1 | 控制台 | `/admin/index` | `dashboard` | fa-tachometer-alt |
+| 2 | 用户管理 | `/admin/users` | `users` | fa-users |
+| 3 | 功能管理 | `/admin/functions` | `functions` | fa-list-alt |
+| 4 | 权限管理 | `/admin/roles` | `roles` | fa-user-shield |
+| 5 | 模型引擎 | `/admin/models` | `models` | fa-microchip |
+| 6 | 瞭望管理 | `/admin/watch-sources` | `watch` | fa-eye |
+| 7 | 数据仓库 | `/admin/data-warehouse` | `warehouse` | fa-database |
+| 8 | 深度采集 | `/admin/deep-collect` | `deep` | fa-microscope |
+| 9 | 接口管理 | `#` | `api` | fa-plug |
+| 10 | 数字员工 | `#` | `employee` | fa-robot |
+| 11 | 技能管理 | `#` | `skills` | fa-tools |
+| 12 | 会话管理 | `#` | `sessions` | fa-history |
+| 13 | 对话管理 | `#` | `chats` | fa-comments |
+| 14 | 数智大屏 | `#` | `dashboard_screen` | fa-chart-bar |
+| 15 | 系统设置 | `#` | `system` | fa-cog |
+
 - **Controller（控制层）** — `app/controllers/`
   - `admin_auth.py`：后台认证控制器（登录/登出/主页）
   - `admin_manage.py`：后台管理控制器（功能/角色/用户三大模块的完整 CRUD）

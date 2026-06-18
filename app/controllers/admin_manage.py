@@ -41,7 +41,7 @@ class FuncListHandler(tornado.web.RequestHandler):
         self.render(
             "admin/func_list.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="functions",
             **result,
             total_pages=total_pages,
             keyword=keyword,
@@ -55,7 +55,7 @@ class FuncAddHandler(tornado.web.RequestHandler):
         self.render(
             "admin/func_edit.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="functions",
             func=None,
             all_funcs=all_funcs,
             is_add=True,
@@ -86,7 +86,7 @@ class FuncEditHandler(tornado.web.RequestHandler):
         self.render(
             "admin/func_edit.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="functions",
             func=func,
             all_funcs=all_funcs,
             is_add=False,
@@ -126,7 +126,7 @@ class RoleListHandler(tornado.web.RequestHandler):
         self.render(
             "admin/role_list.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="roles",
             **result,
             total_pages=total_pages,
             keyword=keyword,
@@ -140,7 +140,7 @@ class RoleAddHandler(tornado.web.RequestHandler):
         self.render(
             "admin/role_edit.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="roles",
             role=None,
             func_tree=func_tree,
             is_add=True,
@@ -172,7 +172,7 @@ class RoleEditHandler(tornado.web.RequestHandler):
         self.render(
             "admin/role_edit.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="roles",
             role=role,
             func_tree=func_tree,
             is_add=False,
@@ -235,7 +235,7 @@ class UserListHandler(tornado.web.RequestHandler):
         self.render(
             "admin/user_list.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="users",
             list=rows, total=total, page=page, page_size=20,
             total_pages=total_pages,
             keyword=keyword,
@@ -249,7 +249,7 @@ class UserAddHandler(tornado.web.RequestHandler):
         self.render(
             "admin/user_edit.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="users",
             user=None,
             roles=roles,
             is_add=True,
@@ -285,7 +285,7 @@ class UserEditHandler(tornado.web.RequestHandler):
         self.render(
             "admin/user_edit.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="users",
             user=user,
             roles=roles,
             is_add=False,

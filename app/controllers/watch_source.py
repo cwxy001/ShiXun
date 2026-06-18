@@ -35,7 +35,7 @@ class WatchSourceListHandler(tornado.web.RequestHandler):
         self.render(
             "admin/watch_source_list.html",
             username=_get_current_user(self),
-            current_page="monitor",
+            current_page="watch",
             **result,
             total_pages=total_pages,
             keyword=keyword,
@@ -49,7 +49,7 @@ class WatchSourceAddHandler(tornado.web.RequestHandler):
         self.render(
             "admin/watch_source_edit.html",
             username=_get_current_user(self),
-            current_page="monitor",
+            current_page="watch",
             source=None,
             is_add=True,
         )
@@ -80,7 +80,7 @@ class WatchSourceEditHandler(tornado.web.RequestHandler):
         self.render(
             "admin/watch_source_edit.html",
             username=_get_current_user(self),
-            current_page="monitor",
+            current_page="watch",
             source=source,
             is_add=False,
         )

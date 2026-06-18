@@ -39,7 +39,7 @@ class ModelListHandler(tornado.web.RequestHandler):
         self.render(
             "admin/model_list.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="models",
             **result,
             total_pages=total_pages,
             keyword=keyword,
@@ -53,7 +53,7 @@ class ModelAddHandler(tornado.web.RequestHandler):
         self.render(
             "admin/model_edit.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="models",
             model=None,
             is_add=True,
         )
@@ -93,7 +93,7 @@ class ModelEditHandler(tornado.web.RequestHandler):
         self.render(
             "admin/model_edit.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="models",
             model=model,
             is_add=False,
         )
@@ -159,7 +159,7 @@ class ModelChatHandler(tornado.web.RequestHandler):
         self.render(
             "admin/model_chat.html",
             username=_get_current_user(self),
-            current_page="settings",
+            current_page="models",
             model=model,
             all_models=all_models,
         )
