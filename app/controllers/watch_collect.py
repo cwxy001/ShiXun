@@ -196,17 +196,17 @@ def _extract_items(html: str, keyword: str, base_url: str = "") -> list:
             if item:
                 items.append(item)
 
-    # 方法2: 查找 a 标签，关键词必须出现在标题或URL中
-    if not items:
+    # 方法2: 泛化提取 — 所有有效链接（不限关键词在标题）
+    # 关键词相关性由后续评分环节过滤，而非硬性要求标题匹配
+    if len(items) < 10:
         for a in soup.find_all("a", href=True):
             title = a.get_text(strip=True)
             href = a.get("href", "")
             if not _is_valid_title(title):
                 continue
-            if not _keyword_in_text(title, keyword_lower):
-                continue
+            # 仅排除明显无关的链接（已由 _is_valid_title 处理）
             snippet = _get_parent_text(a)
-            if not _keyword_in_text(snippet, keyword_lower):
+            if not snippet:
                 snippet = _get_sibling_text(a)
             items.append({
                 "title": title[:200],
@@ -227,10 +227,8 @@ def _extract_items(html: str, keyword: str, base_url: str = "") -> list:
                 href = ""
             if not _is_valid_title(title):
                 continue
-            if not _keyword_in_text(title, keyword_lower):
-                continue
             snippet = _get_parent_text(tag)
-            if not _keyword_in_text(snippet, keyword_lower):
+            if not snippet:
                 snippet = tag.get_text(strip=True)
             items.append({
                 "title": title[:200],
@@ -243,7 +241,7 @@ def _extract_items(html: str, keyword: str, base_url: str = "") -> list:
     scored = []
     for item in items:
         score = _keyword_relevance_score(item["title"], item["snippet"], keyword_lower)
-        if score >= 0.15:  # 至少有一定相关性
+        if score >= 0.02:  # 极低阈值，靠评分排序保证质量
             item["_score"] = score
             scored.append(item)
 
@@ -315,9 +313,6 @@ def _extract_from_container(container, keyword_lower: str, base_url: str) -> dic
     title = a_tag.get_text(strip=True)
     href = a_tag.get("href", "")
     if not _is_valid_title(title):
-        return None
-    # 关键词必须出现在标题中（搜索结果容器内）
-    if not _keyword_in_text(title, keyword_lower):
         return None
 
     # 找摘要文本
