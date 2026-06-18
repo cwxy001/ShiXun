@@ -1,4 +1,4 @@
-{% extends "admin/base.html" %}
+{% extends "base.html" %}
 {% block title %}智能舆情{% end %}
 
 {% block content %}
@@ -193,7 +193,7 @@
                     <td>{{ item['sentiment_score'] }}</td>
                     <td><span class="risk-badge {{ item['risk_level'] }}">{{ {'low':'低','medium':'中','high':'高','critical':'严重'}.get(item['risk_level'], item['risk_level']) }}</span></td>
                     <td>{{ item['hot_value'] }}</td>
-                    <td>{{ item.get('source_user','-') }}</td>
+                    <td>{{ item['source_user'] or '-' }}</td>
                     <td>{{ item['created_at'] }}</td>
                     <td>
                         <form action="/admin/sentiment/delete" method="post" style="display:inline;" onsubmit="return confirm('确定删除?')">
