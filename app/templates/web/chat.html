@@ -395,6 +395,41 @@
             to { transform: rotate(360deg); }
         }
 
+        /* 天气卡片 */
+        .weather-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 18px 20px; color: #fff; margin-top: 12px; max-width: 420px; }
+        .weather-card .wc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .weather-card .wc-city { font-size: 16px; font-weight: 700; }
+        .weather-card .wc-temp { font-size: 42px; font-weight: 200; line-height: 1; }
+        .weather-card .wc-desc { font-size: 14px; opacity: 0.9; }
+        .weather-card .wc-details { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
+        .weather-card .wc-item { font-size: 12px; opacity: 0.85; }
+        .weather-card .wc-item strong { display: block; font-size: 15px; opacity: 1; }
+        .weather-card .wc-forecast { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.2); }
+        .weather-card .wc-day { text-align: center; font-size: 11px; opacity: 0.9; flex: 1; }
+        .weather-card .wc-day .wc-day-temp { font-size: 13px; font-weight: 600; }
+
+        /* 音乐卡片 */
+        .music-card { background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; padding: 16px; margin-top: 12px; max-width: 500px; }
+        .music-card .mc-title { font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 12px; }
+        .music-card .mc-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+        .music-card .mc-item:last-child { border-bottom: none; }
+        .music-card .mc-art { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: #f1f5f9; }
+        .music-card .mc-info { flex: 1; min-width: 0; }
+        .music-card .mc-track { font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .music-card .mc-artist { font-size: 12px; color: #64748b; }
+        .music-card .mc-genre { font-size: 11px; color: #94a3b8; }
+        .music-card .mc-link { font-size: 11px; color: #4a6cf7; text-decoration: none; flex-shrink: 0; }
+
+        /* 报表卡片 */
+        .report-card { background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; padding: 18px; margin-top: 12px; max-width: 600px; }
+        .report-card .rc-title { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 12px; }
+        .report-card .rc-chart { height: 200px; margin-bottom: 12px; }
+        .report-card .rc-summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+        .report-card .rc-stat { background: #f8fafc; border-radius: 8px; padding: 10px 14px; text-align: center; }
+        .report-card .rc-stat .rc-val { font-size: 20px; font-weight: 700; color: #4a6cf7; }
+        .report-card .rc-stat .rc-label { font-size: 11px; color: #94a3b8; }
+        .report-card .rc-actions { display: flex; gap: 8px; }
+
         /* @mention 下拉建议 */
         .mention-dropdown {
             position: absolute; bottom: 100%; left: 0;
@@ -549,7 +584,8 @@
     </div>
 </div>
 
-<script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
     let currentConvId = {{ conv_id if conv_id else 0 }};
     let isStreaming = false;
     let streamBuffer = '';
@@ -872,6 +908,18 @@
                                             <span>${escapeHtml(data.content)}</span>
                                         </div>
                                     `;
+                                    // 立即渲染服务卡片（天气/音乐/报表），不等待 done
+                                    const sd = data.service_data;
+                                    if (sd) {
+                                        if (data.service_type === '天气' || data.service_type === 'weather') {
+                                            renderWeatherCard(bubble.parentElement, sd);
+                                        } else if (data.service_type === '音乐' || data.service_type === 'music') {
+                                            renderMusicCard(bubble.parentElement, sd);
+                                        } else if (data.service_type === '报表' || data.service_type === 'report' || data.service_type === '问数报表') {
+                                            const rd = { title: sd.title, chart_type: sd.chart_type, chart_data: sd.chart_data, summary: sd.summary, csv: sd.csv, json: sd.json };
+                                            if (rd.chart_data) renderReportCard(bubble.parentElement, rd);
+                                        }
+                                    }
                                 } else if (data.type === 'done') {
                                     if (data.conversation_id) {
                                         currentConvId = data.conversation_id;
@@ -889,6 +937,18 @@
                                         doneMark.style.color = '#166534';
                                         doneMark.innerHTML = `<i class="fas fa-check-circle"></i> <span class="skill-badge" style="background:#22c55e;display:flex;align-items:center;gap:3px;">${avatarEl2} @${escapeHtml(data.display_name || data.skill)}</span> <span>数字员工任务完成</span>`;
                                         bubble.parentElement.appendChild(doneMark);
+                                    }
+                                    // 天气卡片
+                                    if (data.weather_data) {
+                                        renderWeatherCard(bubble.parentElement, data.weather_data);
+                                    }
+                                    // 音乐卡片
+                                    if (data.music_data) {
+                                        renderMusicCard(bubble.parentElement, data.music_data);
+                                    }
+                                    // 报表卡片
+                                    if (data.report_data) {
+                                        renderReportCard(bubble.parentElement, data.report_data);
                                     }
                                 } else if (data.type === 'error') {
                                     bubble.innerHTML = '<span style="color:#ef4444;">' + data.content + '</span>';
@@ -1008,6 +1068,131 @@
 
     // 初始滚动到底部
     scrollBottom();
+
+    // ================= 技能卡片渲染 =================
+
+    function renderWeatherCard(parent, data) {
+        if (data.error || data.temperature == null) return;
+        const card = document.createElement('div');
+        card.className = 'weather-card';
+        const fc = data.forecast || [];
+        card.innerHTML = `
+            <div class="wc-header">
+                <span class="wc-city">${escapeHtml(data.city)}</span>
+                <span class="wc-desc">${escapeHtml(data.weather)}</span>
+            </div>
+            <div class="wc-temp">${data.temperature}°C</div>
+            <div style="font-size:12px;opacity:0.8;">体感 ${data.feels_like}°C · ${escapeHtml(data.source)}</div>
+            <div class="wc-details">
+                <div class="wc-item"><strong>${data.humidity}%</strong>湿度</div>
+                <div class="wc-item"><strong>${data.wind_speed} km/h</strong>${escapeHtml(data.wind_direction || '')}风</div>
+                <div class="wc-item"><strong>${data.pressure || '-'} hPa</strong>气压</div>
+            </div>
+            ${fc.length ? `
+            <div class="wc-forecast">
+                ${fc.slice(0,4).map(f => `
+                <div class="wc-day">
+                    <div>${f.date && f.date.slice(5)}</div>
+                    <div style="font-size:10px;">${escapeHtml(f.weather)}</div>
+                    <div class="wc-day-temp">${f.high}°/${f.low}°</div>
+                </div>`).join('')}
+            </div>` : ''}
+        `;
+        parent.appendChild(card);
+    }
+
+    function renderMusicCard(parent, data) {
+        if (data.error || !data.results || data.results.length === 0) return;
+        const card = document.createElement('div');
+        card.className = 'music-card';
+        const items = data.results.slice(0, 5);
+        card.innerHTML = `
+            <div class="mc-title"><i class="fas fa-music" style="color:#8b5cf6;margin-right:6px;"></i>${escapeHtml(data.query)} — 搜索结果 (${data.result_count} 首)</div>
+            ${items.map(it => `
+            <div class="mc-item">
+                ${it.artwork_url ? `<img src="${escapeHtml(it.artwork_url)}" class="mc-art" onerror="this.style.display='none'">` : '<div class="mc-art" style="display:flex;align-items:center;justify-content:center;color:#94a3b8;"><i class="fas fa-music"></i></div>'}
+                <div class="mc-info">
+                    <div class="mc-track">${escapeHtml(it.track_name)}</div>
+                    <div class="mc-artist">${escapeHtml(it.artist_name)} · ${escapeHtml(it.collection_name)}</div>
+                    <div class="mc-genre">${escapeHtml(it.primary_genre || '')}</div>
+                </div>
+                ${it.track_view_url ? `<a href="${escapeHtml(it.track_view_url)}" target="_blank" class="mc-link"><i class="fas fa-external-link-alt"></i> 试听</a>` : ''}
+            </div>`).join('')}
+        `;
+        parent.appendChild(card);
+    }
+
+    function renderReportCard(parent, data) {
+        if (!data || !data.chart_data || !data.chart_data.labels) return;
+        const card = document.createElement('div');
+        card.className = 'report-card';
+        const canvasId = 'rptChart_' + Date.now();
+        card.innerHTML = `
+            <div class="rc-title"><i class="fas fa-chart-bar" style="color:#4a6cf7;margin-right:6px;"></i>${escapeHtml(data.title || '数据报表')}</div>
+            ${data.summary ? `
+            <div class="rc-summary">
+                ${data.summary.total != null ? `<div class="rc-stat"><div class="rc-val">${data.summary.total}</div><div class="rc-label">总计</div></div>` : ''}
+                ${data.summary.avg != null ? `<div class="rc-stat"><div class="rc-val">${data.summary.avg}</div><div class="rc-label">均值</div></div>` : ''}
+                ${data.summary.max != null ? `<div class="rc-stat"><div class="rc-val">${data.summary.max}</div><div class="rc-label">峰值</div></div>` : ''}
+            </div>` : ''}
+            <div class="rc-chart"><canvas id="${canvasId}"></canvas></div>
+            <div class="rc-actions">
+                ${data.csv ? `<button onclick="downloadCSV('${canvasId}',${JSON.stringify(escapeHtml(data.csv)).replace(/"/g,'&quot;')})" class="btn btn-sm" style="padding:5px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;background:#fff;font-size:12px;"><i class="fas fa-file-csv"></i> CSV</button>` : ''}
+                ${data.json ? `<button onclick="downloadJSON('${canvasId}')" class="btn btn-sm" style="padding:5px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;background:#fff;font-size:12px;"><i class="fas fa-file-code"></i> JSON</button>` : ''}
+            </div>
+        `;
+        parent.appendChild(card);
+
+        // 渲染 Chart.js
+        setTimeout(() => {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            new Chart(ctx, {
+                type: data.chart_type || 'bar',
+                data: {
+                    labels: data.chart_data.labels || [],
+                    datasets: [{
+                        label: data.title || '数据',
+                        data: data.chart_data.values || [],
+                        backgroundColor: 'rgba(74, 108, 247, 0.6)',
+                        borderColor: '#4a6cf7',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }, 100);
+
+        // 存储导出数据
+        card._reportCSV = data.csv || '';
+        card._reportJSON = data.json || '';
+
+        // 覆写按钮事件
+        card.querySelectorAll('button').forEach(btn => {
+            const txt = btn.textContent.trim();
+            btn.addEventListener('click', () => {
+                if (txt.includes('CSV')) downloadCSV(data.title, card._reportCSV);
+                if (txt.includes('JSON')) downloadJSON(data.title, card._reportJSON);
+            });
+        });
+    }
+
+    function downloadCSV(title, csv) {
+        const blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = (title || 'report') + '.csv';
+        a.click(); URL.revokeObjectURL(url);
+    }
+
+    function downloadJSON(title, json) {
+        const blob = new Blob([json], {type:'application/json;charset=utf-8;'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = (title || 'report') + '.json';
+        a.click(); URL.revokeObjectURL(url);
+    }
 </script>
 </body>
 </html>

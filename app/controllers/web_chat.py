@@ -17,6 +17,30 @@ except ImportError:
     DigitalEmployeeRepository = None
     AiSkillRepository = None
 
+# 技能调度系统导入
+from app.services.skill_scheduler import (
+    parse_command, dispatch_skill, register_builtin_skills, get_registered_skills
+)
+
+# 技能服务导入（保留用于兼容旧代码）
+try:
+    from app.services.weather_service import get_weather
+except ImportError:
+    get_weather = None
+try:
+    from app.services.music_service import search_music
+except ImportError:
+    search_music = None
+try:
+    from app.services.report_service import generate_sql_report, export_report_csv, export_report_json
+except ImportError:
+    generate_sql_report = None
+    export_report_csv = None
+    export_report_json = None
+
+# 注册内置技能（搜索、天气、音乐、报表、帮助）
+register_builtin_skills()
+
 
 def _require_web_login(handler):
     username = handler.get_secure_cookie("admin_user")
@@ -126,16 +150,61 @@ class ChatSSEHandler(tornado.web.RequestHandler):
         # 意图识别：检测是否为 SQL 问数请求
         intent = _detect_intent(user_message)
 
-        # @xxx 数字员工调用检测
-        skill_name, skill_args, is_skill = _parse_at_command(user_message)
+        # @xxx / \xxx 数字员工调用检测（使用技能调度器）
+        skill_name, skill_args, is_skill = parse_command(user_message)
         resolved_name = skill_name
         cached_skill_prompt = ""
         search_result = None  # 网络搜索结果
+        skill_service_data = None  # 天气/音乐/报表服务数据
+        dispatch_result = None  # 调度器执行结果
+
         if is_skill:
             cached_skill_prompt, resolved_name = _get_skill_prompt(skill_name, skill_args)
-            # 如果是搜索类技能，执行实际网络搜索
-            if skill_name.lower() in ("search", "搜索"):
-                search_result = _execute_web_search(skill_args or user_message)
+
+            # 通过技能调度器统一调度执行
+            dispatch_result = dispatch_skill(skill_name, skill_args, context={
+                "caller_type": "web_user",
+                "caller_id": user_id,
+                "caller_name": username,
+            })
+
+            if dispatch_result["success"]:
+                data = dispatch_result["data"]
+                if data:
+                    # 根据技能类型分类处理调度结果
+                    if skill_name.lower() in ("search", "搜索"):
+                        search_result = data
+                    elif skill_name.lower() in ("天气", "weather"):
+                        skill_service_data = data
+                    elif skill_name.lower() in ("音乐", "music"):
+                        skill_service_data = data
+                    elif skill_name.lower() in ("报表", "report", "问数报表"):
+                        skill_service_data = data
+            else:
+                # 调度失败，但继续尝试让 AI 回答（使用缓存的 prompt）
+                pass
+
+        # 非 @ 指令：检测是否有报表意图关键词
+        is_report = False
+        if not is_skill and generate_sql_report:
+            rpt_keywords = ["生成报表", "数据报表", "统计报表", "问数报表", "报表导出", "数据报告"]
+            for kw in rpt_keywords:
+                if kw in user_message:
+                    is_report = True
+                    # 通过调度器执行报表
+                    dispatch_result = dispatch_skill("report", user_message, context={
+                        "caller_type": "web_user",
+                        "caller_id": user_id,
+                        "caller_name": username,
+                    })
+                    if dispatch_result["success"] and dispatch_result["data"]:
+                        skill_service_data = dispatch_result["data"]
+                    else:
+                        skill_service_data = _execute_report(user_message)
+                    is_skill = True
+                    skill_name = "report"
+                    resolved_name = "问数报表"
+                    break
 
         self.set_header("Content-Type", "text/event-stream")
         self.set_header("Cache-Control", "no-cache")
@@ -147,18 +216,34 @@ class ChatSSEHandler(tornado.web.RequestHandler):
             if is_skill:
                 emp_info = _lookup_employee(skill_name)
                 extra = ""
+                sdata = None
                 if search_result:
                     rc = search_result.get("result_count", 0)
                     source = search_result.get("source", "live")
                     extra = f" | 已检索到 {rc} 条结果 ({source})"
+                elif skill_service_data:
+                    sdata = skill_service_data
+                    if skill_name.lower() in ("天气", "weather"):
+                        if sdata.get("temperature") is not None:
+                            extra = f" | {sdata['city']} {sdata['temperature']}°C {sdata['weather']}"
+                        else:
+                            extra = f" | {sdata.get('error', '查询中')}"
+                    elif skill_name.lower() in ("音乐", "music"):
+                        rc = sdata.get("result_count", 0)
+                        extra = f" | 找到 {rc} 首歌曲"
+                    elif skill_name.lower() in ("报表", "report", "问数报表"):
+                        row_count = sdata.get("row_count", 0) if sdata else 0
+                        extra = f" | {sdata.get('title', '报表')} ({row_count}行)"
                 skill_start = json.dumps({
                     "type": "skill_start",
                     "skill": resolved_name,
                     "display_name": emp_info.get("display_name", resolved_name),
                     "avatar": emp_info.get("avatar", ""),
                     "role": emp_info.get("role", ""),
-                    "content": f"正在调用网络搜索: {skill_args}{extra}",
+                    "content": f"正在调用{'网络搜索' if search_result else '数字员工'} @{resolved_name} ...{extra}",
                     "search_info": search_result,
+                    "service_data": sdata,
+                    "service_type": skill_name.lower() if skill_service_data else None,
                 }, ensure_ascii=False)
                 self.write(f"data: {skill_start}\n\n")
                 await self.flush()
@@ -177,9 +262,9 @@ class ChatSSEHandler(tornado.web.RequestHandler):
             # 构建消息列表
             messages = []
 
-            # 系统提示词：@xxx 数字员工 > SQL > 自定义 > 默认
+            # 系统提示词：@xxx 数字员工 > 服务数据 > SQL > 自定义 > 默认
             if is_skill:
-                # 搜索类技能：如有实时搜索结果，注入结果；否则用静态 prompt
+                # 搜索类技能：如有实时搜索结果
                 if search_result and search_result.get("prompt_fragment"):
                     messages.append({
                         "role": "system",
@@ -188,6 +273,24 @@ class ChatSSEHandler(tornado.web.RequestHandler):
                             "你的任务是基于以下搜索结果，为用户提供准确、全面的回答。\n\n"
                             + search_result["prompt_fragment"]
                         )
+                    })
+                # 天气服务：注入实时天气数据
+                elif skill_service_data and skill_name.lower() in ("天气", "weather"):
+                    messages.append({
+                        "role": "system",
+                        "content": _build_weather_prompt(skill_service_data),
+                    })
+                # 音乐服务：注入搜索结果
+                elif skill_service_data and skill_name.lower() in ("音乐", "music"):
+                    messages.append({
+                        "role": "system",
+                        "content": _build_music_prompt(skill_service_data),
+                    })
+                # 报表服务：注入报表数据
+                elif skill_service_data and skill_name.lower() in ("报表", "report", "问数报表"):
+                    messages.append({
+                        "role": "system",
+                        "content": _build_report_prompt(skill_service_data),
                     })
                 else:
                     messages.append({"role": "system", "content": cached_skill_prompt})
@@ -278,6 +381,26 @@ class ChatSSEHandler(tornado.web.RequestHandler):
                 emp = _lookup_employee(skill_name)
                 done_info["display_name"] = emp.get("display_name", resolved_name)
                 done_info["avatar"] = emp.get("avatar", "")
+            # 附加服务数据给前端渲染
+            if skill_service_data:
+                if skill_name.lower() in ("天气", "weather"):
+                    done_info["weather_data"] = skill_service_data
+                elif skill_name.lower() in ("音乐", "music"):
+                    done_info["music_data"] = skill_service_data
+                elif skill_name.lower() in ("报表", "report", "问数报表"):
+                    done_info["report_data"] = {
+                        "title": skill_service_data.get("title"),
+                        "chart_type": skill_service_data.get("chart_type"),
+                        "chart_data": skill_service_data.get("chart_data"),
+                        "summary": skill_service_data.get("summary"),
+                        "csv": export_report_csv(skill_service_data) if export_report_csv else "",
+                        "json": export_report_json(skill_service_data) if export_report_json else "",
+                    }
+            if search_result:
+                done_info["search_data"] = {
+                    "results": search_result.get("results", []),
+                    "source": search_result.get("source"),
+                }
             done_data = json.dumps(done_info, ensure_ascii=False)
             self.write(f"data: {done_data}\n\n")
             await self.flush()
@@ -328,7 +451,7 @@ class ChatEmployeesHandler(tornado.web.RequestHandler):
 
 
 def _get_available_employees() -> list:
-    """获取启用的数字员工及其技能列表"""
+    """获取启用的数字员工及其技能列表（含技能调度器中注册的技能）"""
     employees = []
     # 先从数据库读取
     if DigitalEmployeeRepository:
@@ -364,6 +487,23 @@ def _get_available_employees() -> list:
     for b in builtins:
         if b["trigger"] not in builtin_names:
             employees.append(b)
+    # 补充技能调度器中注册的技能
+    try:
+        reg_skills = get_registered_skills()
+        for sk in reg_skills:
+            sk_name = sk["name"]
+            sk_name_lower = sk_name.lower()
+            if sk_name_lower not in builtin_names and sk_name_lower not in [e["trigger"] for e in employees]:
+                employees.append({
+                    "name": sk_name,
+                    "trigger": sk_name_lower,
+                    "avatar": "",
+                    "role": sk.get("description", f"\\{sk_name} 技能"),
+                    "skills": [],
+                    "status": "enabled",
+                })
+    except Exception:
+        pass
     return employees
 
 
@@ -409,6 +549,7 @@ def _detect_intent(message: str) -> str:
 
 def _parse_at_command(message: str):
     """
+    [已废弃] 请使用 app.services.skill_scheduler.parse_command 代替。
     解析 @xxx 或 \\xxx 数字员工调用命令。
     返回 (skill_name, cleaned_message, is_skill)
     支持格式：@天气 北京、@音乐 周杰伦、@西师妹 你好、@search Python教程
@@ -462,6 +603,44 @@ def _execute_web_search(query: str) -> dict:
         }
 
 
+def _execute_weather(city: str) -> dict:
+    """执行天气查询"""
+    try:
+        if get_weather:
+            result = get_weather(city)
+            return result
+    except Exception as e:
+        pass
+    return {"error": "天气服务不可用", "city": city}
+
+
+def _execute_music(query: str) -> dict:
+    """执行音乐查询"""
+    try:
+        if search_music:
+            result = search_music(query)
+            return result
+    except Exception:
+        pass
+    return {"error": "音乐服务不可用", "query": query, "results": []}
+
+
+def _execute_report(query: str) -> dict:
+    """执行问数报表生成"""
+    try:
+        if generate_sql_report:
+            result = generate_sql_report(query)
+            # 预生成 CSV/JSON 以供前端渲染
+            if export_report_csv:
+                result["csv"] = export_report_csv(result)
+            if export_report_json:
+                result["json"] = export_report_json(result)
+            return result
+    except Exception:
+        pass
+    return {"error": "报表服务不可用", "type": "empty", "title": "报表"}
+
+
 def _lookup_employee(skill_name: str) -> dict:
     """查找数字员工的显示信息"""
     skill_lower = skill_name.lower()
@@ -479,6 +658,127 @@ def _lookup_employee(skill_name: str) -> dict:
         except Exception:
             pass
     return {"display_name": skill_name, "avatar": "", "role": ""}
+
+
+def _build_weather_prompt(data: dict) -> str:
+    """将天气API数据格式化为AI提示词"""
+    if data.get("error"):
+        return f"天气查询失败：{data['error']}。请友好告知用户并建议稍后重试或查询其他城市。"
+
+    city = data.get("city", "未知")
+    temp = data.get("temperature", "N/A")
+    feels = data.get("feels_like", "N/A")
+    weather = data.get("weather", "未知")
+    humidity = data.get("humidity", "N/A")
+    wind = data.get("wind_speed", "N/A")
+    wind_dir = data.get("wind_direction", "")
+    pressure = data.get("pressure", "N/A")
+
+    prompt = (
+        f"你是一个专业的气象播报员。请根据以下实时天气数据，为用户生成一个自然友好的中文天气播报。\n\n"
+        f"**当前天气数据（{city}）：**\n"
+        f"- 温度：{temp}°C（体感 {feels}°C）\n"
+        f"- 天气：{weather}\n"
+        f"- 湿度：{humidity}%\n"
+        f"- 风力：{wind} km/h {wind_dir}\n"
+        f"- 气压：{pressure} hPa\n"
+    )
+
+    forecast = data.get("forecast", [])
+    if forecast:
+        prompt += "\n**未来预报：**\n"
+        for f in forecast:
+            prompt += f"- {f['date']}：{f['weather']}，{f['low']}°C ~ {f['high']}°C"
+            if f.get("precip_pct"):
+                prompt += f"，降水概率 {f['precip_pct']}%"
+            prompt += "\n"
+
+    prompt += (
+        "\n请以温馨自然的语气播报，包括：\n"
+        "1. 一句话概括当前天气\n"
+        "2. 逐项说明温湿度、风力等\n"
+        "3. 未来趋势\n"
+        "4. 生活建议（穿衣/出行/防晒等）\n"
+        "使用适当的表情符号让播报更生动。"
+    )
+    return prompt
+
+
+def _build_music_prompt(data: dict) -> str:
+    """将音乐API数据格式化为AI提示词"""
+    if data.get("error"):
+        return f"音乐查询失败：{data['error']}。请友好告知用户并建议稍后重试。"
+
+    query = data.get("query", "")
+    items = data.get("results", [])
+    if not items:
+        return f"未找到与「{query}」相关的音乐。请友好告知用户，并建议尝试其他关键词。"
+
+    prompt = (
+        f"你是一个音乐推荐助手。用户搜索了「{query}」，以下是通过 Apple Music 获取的真实歌曲数据：\n\n"
+    )
+    for i, it in enumerate(items[:8]):
+        artist = it.get("artist_name", "")
+        track = it.get("track_name", "")
+        album = it.get("collection_name", "")
+        genre = it.get("primary_genre", "")
+        url = it.get("track_view_url", "")
+        sec = int(it.get("track_time_ms", 0)) // 1000
+        dur = f"{sec//60}:{sec%60:02d}" if sec else ""
+        prompt += f"{i+1}. {track} — {artist}\n"
+        prompt += f"   专辑：{album} | 流派：{genre} | 时长：{dur}\n"
+        if url:
+            prompt += f"   [试听/购买]({url})\n"
+
+    prompt += (
+        "\n请基于以上数据，为用户生成一个专业的音乐推荐回复：\n"
+        "1. 简要介绍搜索结果\n"
+        "2. 逐首推荐（歌名、歌手、亮点）\n"
+        "3. 如果有相似风格，推荐更多试听方向\n"
+        "4. 鼓励用户点击链接试听\n"
+        "回复格式使用 Markdown，歌曲名用粗体。"
+    )
+    return prompt
+
+
+def _build_report_prompt(data: dict) -> str:
+    """将报表数据格式化为AI提示词"""
+    if data.get("error"):
+        return f"报表生成失败：{data['error']}。请友好告知用户。"
+
+    if data.get("type") == "empty":
+        return f"报表「{data.get('title', '')}」暂无数据。请友好告知用户。"
+
+    title = data.get("title", "数据报表")
+    md_table = data.get("markdown_table", "")
+    summary = data.get("summary", {})
+    chart_data = data.get("chart_data", {})
+
+    prompt = (
+        f"你是一个数据分析师。用户需要生成一份数据报表。\n"
+        f"以下是系统从数据库中自动查询并汇总的结果：\n\n"
+        f"{md_table}\n\n"
+    )
+    if summary:
+        prompt += "**数据摘要：**\n"
+        if summary.get("total"):
+            prompt += f"- 总计：{summary['total']}\n"
+        if summary.get("avg"):
+            prompt += f"- 均值：{summary['avg']}\n"
+        if summary.get("max"):
+            prompt += f"- 峰值：{summary['max']}\n"
+        prompt += "\n"
+
+    prompt += (
+        "请基于以上数据，为用户撰写一份专业的分析报告：\n"
+        "1. 报告标题\n"
+        "2. 数据概览（一句话总结核心发现）\n"
+        "3. 关键指标分析\n"
+        "4. 趋势解读与洞察\n"
+        "5. 建议（如适用）\n"
+        "使用 Markdown 格式，包含表格和强调标记。"
+    )
+    return prompt
 
 
 def _get_skill_prompt(skill_name: str, skill_args: str) -> tuple:
@@ -565,11 +865,27 @@ def _get_skill_prompt(skill_name: str, skill_args: str) -> tuple:
             "请用热情、有品味的语气回答。"
         ),
         "西师妹": (
-            "你是西师妹，一个活泼可爱、幽默风趣的 AI 数字员工。\n"
-            "你喜欢用轻松俏皮的语气和人聊天，偶尔会开个玩笑，但也能认真回答问题。\n"
-            "你擅长 Python 编程、数据分析、AI 技术等话题。\n"
-            f"对方对你说：{skill_args}\n"
-            "请以「西师妹」的身份和风格回复。"
+            "你是【西师妹】，IOIQ 平台的核心 AI 数字员工，一个充满活力、专业又讨人喜欢的伙伴。\n\n"
+            "## 角色身份\n"
+            "- 姓名：西师妹（Xi Shimei）\n"
+            "- 定位：IOIQ 智能问数平台的 AI 伙伴、技术顾问、数据分析师\n"
+            "- 性格：活泼开朗、幽默风趣、善解人意\n"
+            "- 口头禅：\"让我帮你看看数据~\" \"这可难不倒我！\" \"数据说了算~\"\n\n"
+            "## 专业能力\n"
+            "- Python 编程与数据分析专家\n"
+            "- 数据库查询与 SQL 优化\n"
+            "- AI/机器学习技术科普\n"
+            "- 系统运维与架构指导\n"
+            "- 业务报表解读与数据可视化\n"
+            "- 代码调试与性能优化\n\n"
+            "## 交流风格\n"
+            "- 使用轻松俏皮的语气，偶尔用颜文字 (^_^) 或表情符号\n"
+            "- 专业问题要认真但不死板，善用比喻帮助理解\n"
+            "- 遇到不会的问题诚实说「这个我还需要学习一下~」\n"
+            "- 主动提供下一步建议，像朋友一样关心用户进度\n"
+            "- 回复末尾可以加一句鼓励或关心的问候\n\n"
+            f"用户对你说：{skill_args}\n\n"
+            "请以「西师妹」的身份回复，保持活泼友好又专业。"
         ),
         "search": (
             "你是一个网络搜索数字员工。用户需要搜索互联网上的信息。\n"

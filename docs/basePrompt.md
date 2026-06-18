@@ -107,7 +107,8 @@ IOIQ-System/
 │  ├─ requirementPrompt.md # 需求相关提示词
 │  └─ treePromot.md        # 项目目录结构提示词
 ├─ test/                   # 单元测试脚本目录
-│  └─ testCase1.py         # 用户模块基础测试用例
+│  ├─ testCase1.py         # 用户模块基础测试用例
+│  └─ test_skill_scheduler.py  # 技能调度系统测试用例（6项）
 └─ app.py                  # 主程序入口
 ```
 
@@ -134,7 +135,7 @@ IOIQ-System/
   - `dashboard_screen.py`：`DashboardRepository` 全模块聚合查询
   - `system_settings.py`：`SystemSettingsRepository` 设置CRUD + 备份恢复 + 运行状态 + `OperationLogRepository` 日志分页/筛选/清空
   - `web_search_log.py`：`WebSearchLogRepository` 搜索日志CRUD + 统计 + 清空
-  - `app/services/`：`web_search.py`（搜索服务 + 缓存 + AI Prompt格式化）、`search_adapter.py`（搜索引擎适配器）
+  - `app/services/`：`skill_scheduler.py`（技能调度系统/命令解析/动态注册/路由分发/日志）、`web_search.py`（搜索服务）、`search_adapter.py`（搜索适配器）、`weather_service.py`（Open-Meteo 天气API/30城市坐标/4日预报）、`music_service.py`（iTunes Search API/歌曲+歌手）、`report_service.py`（NL→SQL 报表引擎/自动图表/CSV+JSON导出）
 - **View（视图层）** — `app/templates/`
   - 后台页面（`admin/`）：登录页、基础布局模板（ZUI 上/左/右布局，左侧菜单15项扁平无分组）、控制台首页
   - **功能管理**：`func_list.html`（列表+分页+搜索）、`func_edit.html`（新增/编辑表单）
@@ -395,6 +396,7 @@ python test/testCase1.py
 - **深度采集模块**：单条/批量深度采集 + SSE流式进度面板 + 实时日志 + 网页抓取(requests+BeautifulSoup) + 默认模型AI分析(OpenAI兼容API) + 统计（成功/失败/耗时/Tokens） + 详情查看页（源数据信息/AI摘要/完整正文/采集日志）
 - **前台认证模块**：用户登录（深色科技风/角色区分：管理员→后台/普通用户→前台）、用户注册（用户名/密码/邮箱/自动绑定普通用户角色）、登出
 - **AI 问数模块**：ChatGPT式对话布局（左侧：模型服务切换 + 历史对话管理，主区：SSE流式对话 + Markdown渲染 + Enter发送/Shift+Enter换行）、意图识别（SQL问数/天气/音乐/通用）、**@xxx 数字员工调用**（@天气/@音乐/@西师妹/@search/@help + \\search，SSE流式响应 + 技能横幅动画 + 完成标记）、数据库表结构自动注入、SQL不展示规则、对话历史CRUD
+- **技能调度模块**：`app/services/skill_scheduler.py`，统一技能调度系统，支持 `\xxx` 和 `@xxx` 命令解析、技能动态注册/注销、处理器路由分发、调度日志自动记录（skill_call_logs表）。内置技能：search（网络搜索）、weather（天气查询）、music（音乐搜索）、report（问数报表）、help（帮助）。web_chat.py 已集成调度器替代原有内联调度逻辑
 - 默认管理员账号：**admin / 123456**
 - 默认角色：超级管理员、普通管理员、普通用户（含预置功能权限）
 - 前台页面（`web/`）已实现登录、注册、AI问数对话
