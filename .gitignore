@@ -2,20 +2,69 @@
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 
 # Virtual environment
 venv/
 .venv/
+env/
+.env/
 
 # Database
 *.db
+database/*.db
+database/*.json
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Uploads
+.uploads/
+uploads/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+.project
+.classpath
+.settings/
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Build/dist
+dist/
+build/
+*.egg-info/
+
+# Node.js
+node_modules/
+package-lock.json
+yarn.lock
+
+# Cache
+.cache/
+.temp/
+.tmp/
+
+# Secrets
+*.env
+.secrets/
+config/secrets.json
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Backup files
+*.bak
+*.backup
+*.old
