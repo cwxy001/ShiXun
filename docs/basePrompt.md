@@ -133,6 +133,8 @@ IOIQ-System/
   - `chat_manage.py`：`ChatManageRepository` 消息CRUD + 分页/筛选/统计 + 审核标记 + 敏感词扫描 + 导出
   - `dashboard_screen.py`：`DashboardRepository` 全模块聚合查询
   - `system_settings.py`：`SystemSettingsRepository` 设置CRUD + 备份恢复 + 运行状态 + `OperationLogRepository` 日志分页/筛选/清空
+  - `web_search_log.py`：`WebSearchLogRepository` 搜索日志CRUD + 统计 + 清空
+  - `app/services/`：`web_search.py`（搜索服务 + 缓存 + AI Prompt格式化）、`search_adapter.py`（搜索引擎适配器）
 - **View（视图层）** — `app/templates/`
   - 后台页面（`admin/`）：登录页、基础布局模板（ZUI 上/左/右布局，左侧菜单15项扁平无分组）、控制台首页
   - **功能管理**：`func_list.html`（列表+分页+搜索）、`func_edit.html`（新增/编辑表单）
@@ -150,11 +152,12 @@ IOIQ-System/
   - **对话管理**：`chat_list.html`（消息表格/5项统计卡片/关键词/用户/角色/审核状态/日期筛选/标记/批量删除+标记/敏感词扫描/分页）、`chat_context.html`（消息上下文/完整对话链路/高亮当前消息）、`chat_stats.html`（5项统计指标/敏感词扫描结果/词库展示）
   - **数智大屏**：`dashboard_screen.html`（独立暗色科技风/Chart.js图表/全屏模式/3套模板切换/拖拽布局/30s自动刷新/核心指标卡片/消息趋势折线图/角色饼图/模型柱状图/24小时热力/实时对话流/风险预警/技能排行/系统资源）
   - **系统设置**：`system_settings.html`（4个配置分区：基本信息/运行参数/SMTP邮件/通知渠道 + 备份按钮）、`system_status.html`（6项运行状态卡片/备份列表/恢复/30s自动刷新）、`operation_logs.html`（操作日志表格/操作人+类型+日期筛选/分页/JSON导出/清空）
+  - **技能增强**：`search_logs.html`（5项统计/日志表格/筛选/清除缓存）、`search_test.html`（搜索测试/结果展示/AI Prompt预览）
   - 前台页面（`web/`）：
     - `base.html` — 前台基础布局模板
     - `login.html` — 前台用户登录页（深色科技风/品牌展示区/角色区分）
     - `register.html` — 前台用户注册页（用户名/邮箱/密码/确认密码）
-    - `chat.html` — AI 智能问数对话页（ChatGPT式布局/左侧模型切换+历史记录/主对话区SSE流式/Enter发送/Shift+Enter换行/@预留调用数字员工/marked.js Markdown渲染）
+    - `chat.html` — AI 智能问数对话页（ChatGPT式布局/左侧模型切换+历史记录/主对话区SSE流式/Enter发送/Shift+Enter换行/@mention下拉自动补全数字员工/调用DB数字员工路由/员工头像显示/SQL问数/marked.js Markdown渲染）
 
 ### 左侧菜单结构（admin/base.html）
 菜单项按以下顺序扁平排列，无分组标题：
@@ -177,6 +180,7 @@ IOIQ-System/
 | 14 | 对话管理 | `/admin/chats` | `chats` | fa-comments |
 | 15 | 数智大屏 | `/admin/dashboard` | `dashboard_screen` | fa-chart-bar |
 | 16 | 系统设置 | `/admin/system` | `system` | fa-cog |
+| 17 | 技能增强 | `/admin/search-logs` | `search_enhance` | fa-search |
 
 - **Controller（控制层）** — `app/controllers/`
   - `admin_auth.py`：后台认证控制器（登录/登出/主页）
@@ -187,7 +191,7 @@ IOIQ-System/
   - `data_warehouse.py`：数据仓库控制器（列表/筛选/单条删除/批量删除，每页20条）
   - `deep_collect.py`：深度采集控制器（SSE流式采集 / 单条+批量 / 网页抓取+BeautifulSoup提取 / 默认模型AI分析 / 详情查看）
   - `web_auth.py`：前台认证控制器（登录/注册/登出，角色区分：管理员→后台/普通用户→前台）
-  - `web_chat.py`：AI 问数对话控制器（ChatGPT式交互 / SSE 流式 / 意图识别SQL天气音乐 / @xxx数字员工调用 / 历史会话管理 / SQLite schema 自动注入 / SQL 不展示规则）
+  - `web_chat.py`：AI 问数对话控制器（ChatGPT式交互 / SSE 流式 / 意图识别SQL天气音乐 / @xxx数字员工调用 / 历史会话管理 / SQLite schema 自动注入 / SQL 不展示规则 / 数字员工列表API）
   - `api_manage.py`：接口管理控制器（CRUD + SSE 在线调试 + 统计 + Markdown文档导出 + 调用日志）
   - `digital_employee.py`：数字员工控制器（CRUD + 状态切换 + SSE 对话测试 + 运营统计 + 版本管理）
   - `skill_manage.py`：技能管理控制器（CRUD + 状态切换 + 热更新刷新 + 调用统计 + 技能市场预留）
@@ -195,6 +199,7 @@ IOIQ-System/
   - `chat_manage.py`：对话管理控制器（消息列表/上下文/删除/批量删除/审核标记/敏感词扫描/JSON导出/统计）
   - `dashboard_screen.py`：数智大屏控制器（主页 + 实时数据 JSON API）
   - `system_settings.py`：系统设置控制器（设置保存/备份恢复/运行状态/操作日志）
+  - `search_enhance.py`：技能增强控制器（搜索日志/统计/缓存清除/搜索测试）
 
 ### 数据库设计
 | 表名 | 说明 | 关键字段 |
@@ -237,6 +242,7 @@ IOIQ-System/
 | `/chat/sse` | ChatSSEHandler(POST) | SSE 流式对话接口（含意图识别） |
 | `/chat/history` | ChatHistoryHandler(GET) | 获取会话历史消息 |
 | `/chat/delete` | ChatDeleteHandler(POST) | 删除对话会话 |
+| `/chat/employees` | ChatEmployeesHandler(GET) | 可用数字员工列表 API (JSON) |
 | `/admin/login` | AdminLoginHandler | 后台登录页 & 登录提交 |
 | `/admin/index` | AdminIndexHandler | 后台控制台（需登录） |
 | `/admin/logout` | AdminLogoutHandler | 后台登出 |

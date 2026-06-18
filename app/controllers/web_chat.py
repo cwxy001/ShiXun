@@ -9,6 +9,14 @@ from app.models.model_engine import ModelEngineRepository
 from app.models.conversation import ConversationRepository, ChatMessageRepository
 from app.models.db import get_connection
 
+# 数字员工/技能相关导入
+try:
+    from app.models.digital_employee import DigitalEmployeeRepository
+    from app.models.ai_skill import AiSkillRepository
+except ImportError:
+    DigitalEmployeeRepository = None
+    AiSkillRepository = None
+
 
 def _require_web_login(handler):
     username = handler.get_secure_cookie("admin_user")
@@ -120,6 +128,14 @@ class ChatSSEHandler(tornado.web.RequestHandler):
 
         # @xxx 数字员工调用检测
         skill_name, skill_args, is_skill = _parse_at_command(user_message)
+        resolved_name = skill_name
+        cached_skill_prompt = ""
+        search_result = None  # 网络搜索结果
+        if is_skill:
+            cached_skill_prompt, resolved_name = _get_skill_prompt(skill_name, skill_args)
+            # 如果是搜索类技能，执行实际网络搜索
+            if skill_name.lower() in ("search", "搜索"):
+                search_result = _execute_web_search(skill_args or user_message)
 
         self.set_header("Content-Type", "text/event-stream")
         self.set_header("Cache-Control", "no-cache")
@@ -127,12 +143,22 @@ class ChatSSEHandler(tornado.web.RequestHandler):
         self.set_header("X-Accel-Buffering", "no")
 
         try:
-            # 如果是 @xxx 数字员工调用，先发送通知事件
+            # 如果是 @xxx 数字员工调用，先发送通知事件（含员工信息）
             if is_skill:
+                emp_info = _lookup_employee(skill_name)
+                extra = ""
+                if search_result:
+                    rc = search_result.get("result_count", 0)
+                    source = search_result.get("source", "live")
+                    extra = f" | 已检索到 {rc} 条结果 ({source})"
                 skill_start = json.dumps({
                     "type": "skill_start",
-                    "skill": skill_name,
-                    "content": f"正在调用数字员工 @{skill_name} ...",
+                    "skill": resolved_name,
+                    "display_name": emp_info.get("display_name", resolved_name),
+                    "avatar": emp_info.get("avatar", ""),
+                    "role": emp_info.get("role", ""),
+                    "content": f"正在调用网络搜索: {skill_args}{extra}",
+                    "search_info": search_result,
                 }, ensure_ascii=False)
                 self.write(f"data: {skill_start}\n\n")
                 await self.flush()
@@ -153,8 +179,18 @@ class ChatSSEHandler(tornado.web.RequestHandler):
 
             # 系统提示词：@xxx 数字员工 > SQL > 自定义 > 默认
             if is_skill:
-                skill_prompt, resolved_name = _get_skill_prompt(skill_name, skill_args)
-                messages.append({"role": "system", "content": skill_prompt})
+                # 搜索类技能：如有实时搜索结果，注入结果；否则用静态 prompt
+                if search_result and search_result.get("prompt_fragment"):
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            "你是一个网络搜索助手。用户正在进行网络信息检索。\n"
+                            "你的任务是基于以下搜索结果，为用户提供准确、全面的回答。\n\n"
+                            + search_result["prompt_fragment"]
+                        )
+                    })
+                else:
+                    messages.append({"role": "system", "content": cached_skill_prompt})
             elif intent == "sql":
                 sql_schema = _get_db_schema()
                 sql_prompt = (
@@ -231,13 +267,18 @@ class ChatSSEHandler(tornado.web.RequestHandler):
                 ConversationRepository.update_title(conversation_id, title)
 
             # 发送结束事件
-            done_data = json.dumps({
+            done_info = {
                 "type": "done",
                 "tokens": total_tokens,
                 "duration_ms": elapsed,
                 "conversation_id": conversation_id,
-                "skill": skill_name if is_skill else None,
-            }, ensure_ascii=False)
+            }
+            if is_skill:
+                done_info["skill"] = resolved_name
+                emp = _lookup_employee(skill_name)
+                done_info["display_name"] = emp.get("display_name", resolved_name)
+                done_info["avatar"] = emp.get("avatar", "")
+            done_data = json.dumps(done_info, ensure_ascii=False)
             self.write(f"data: {done_data}\n\n")
             await self.flush()
 
@@ -272,6 +313,58 @@ class ChatHistoryHandler(tornado.web.RequestHandler):
             "conversation": dict(conv),
             "messages": [dict(m) for m in messages],
         }, ensure_ascii=False))
+
+
+class ChatEmployeesHandler(tornado.web.RequestHandler):
+    """返回可用数字员工列表（供前端 @mention 下拉使用）"""
+
+    def get(self):
+        ok, username = _require_web_login(self)
+        if not ok:
+            return
+        employees = _get_available_employees()
+        self.set_header("Content-Type", "application/json; charset=utf-8")
+        self.write(json.dumps({"employees": employees}, ensure_ascii=False))
+
+
+def _get_available_employees() -> list:
+    """获取启用的数字员工及其技能列表"""
+    employees = []
+    # 先从数据库读取
+    if DigitalEmployeeRepository:
+        try:
+            db_emps = DigitalEmployeeRepository.get_all(enabled_only=True)
+            for emp in db_emps:
+                emp_dict = dict(emp) if hasattr(emp, 'keys') else emp
+                # 解析绑定的技能
+                skills_json = emp_dict.get("skills", "[]")
+                try:
+                    skills = json.loads(skills_json) if isinstance(skills_json, str) else skills_json
+                except (json.JSONDecodeError, TypeError):
+                    skills = []
+                employees.append({
+                    "name": emp_dict.get("name", ""),
+                    "trigger": emp_dict.get("trigger_word", emp_dict.get("name", "").lower()),
+                    "avatar": emp_dict.get("avatar", ""),
+                    "role": emp_dict.get("role_desc", ""),
+                    "skills": skills,
+                    "status": emp_dict.get("status", "enabled"),
+                })
+        except Exception:
+            pass
+    # 补充默认内置技能
+    builtin_names = {e["trigger"] for e in employees}
+    builtins = [
+        {"name": "天气", "trigger": "天气", "avatar": "", "role": "天气查询助手", "skills": [], "status": "enabled"},
+        {"name": "音乐", "trigger": "音乐", "avatar": "", "role": "音乐推荐助手", "skills": [], "status": "enabled"},
+        {"name": "西师妹", "trigger": "西师妹", "avatar": "", "role": "AI 伙伴", "skills": [], "status": "enabled"},
+        {"name": "search", "trigger": "search", "avatar": "", "role": "网络搜索助手", "skills": [], "status": "enabled"},
+        {"name": "help", "trigger": "help", "avatar": "", "role": "帮助助手", "skills": [], "status": "enabled"},
+    ]
+    for b in builtins:
+        if b["trigger"] not in builtin_names:
+            employees.append(b)
+    return employees
 
 
 class ChatDeleteHandler(tornado.web.RequestHandler):
@@ -316,10 +409,10 @@ def _detect_intent(message: str) -> str:
 
 def _parse_at_command(message: str):
     """
-    解析 @xxx 数字员工调用命令。
+    解析 @xxx 或 \\xxx 数字员工调用命令。
     返回 (skill_name, cleaned_message, is_skill)
     支持格式：@天气 北京、@音乐 周杰伦、@西师妹 你好、@search Python教程
-    也支持反斜杠格式：反斜杠search Python教程
+    也支持反斜杠格式：\\search Python教程
     """
     import re
 
@@ -332,8 +425,132 @@ def _parse_at_command(message: str):
     return None, message, False
 
 
-def _get_skill_prompt(skill_name: str, skill_args: str) -> str:
-    """根据数字员工技能名称，返回对应的系统提示词"""
+def _execute_web_search(query: str) -> dict:
+    """执行网络搜索，返回结果摘要"""
+    import time as _time
+    from app.models.web_search_log import WebSearchLogRepository
+    t0 = _time.time()
+    try:
+        from app.services.web_search import search_web, format_for_ai_prompt
+        result = search_web(query, max_results=5)
+        source = result.get("source", "fallback")
+        items = result.get("results", [])
+        # 记录搜索日志
+        urls = json.dumps([it.get("url", "") for it in items])
+        duration = int((_time.time() - t0) * 1000)
+        WebSearchLogRepository.log(
+            query=query,
+            result_count=len(items),
+            source=source,
+            source_urls=urls,
+            duration_ms=duration,
+        )
+        return {
+            "results": items,
+            "source": source,
+            "result_count": len(items),
+            "prompt_fragment": format_for_ai_prompt(query, result),
+            "cached": result.get("cached", False),
+        }
+    except Exception as e:
+        return {
+            "results": [],
+            "source": "error",
+            "result_count": 0,
+            "prompt_fragment": f"网络搜索失败：{str(e)}。请基于已有知识回答。",
+            "error": str(e),
+        }
+
+
+def _lookup_employee(skill_name: str) -> dict:
+    """查找数字员工的显示信息"""
+    skill_lower = skill_name.lower()
+    if DigitalEmployeeRepository:
+        try:
+            employees = DigitalEmployeeRepository.get_all(enabled_only=True)
+            for emp in employees:
+                emp_dict = dict(emp) if hasattr(emp, 'keys') else emp
+                if skill_lower in (emp_dict.get("name", "").lower(), emp_dict.get("trigger_word", "").lower()):
+                    return {
+                        "display_name": emp_dict.get("name", skill_name),
+                        "avatar": emp_dict.get("avatar", ""),
+                        "role": emp_dict.get("role_desc", ""),
+                    }
+        except Exception:
+            pass
+    return {"display_name": skill_name, "avatar": "", "role": ""}
+
+
+def _get_skill_prompt(skill_name: str, skill_args: str) -> tuple:
+    """根据数字员工技能名称，返回对应的系统提示词。
+    优先从数据库查询数字员工和技能配置。
+    返回 (prompt, display_name)"""
+
+    # 1. 从数据库查找匹配的数字员工
+    if DigitalEmployeeRepository:
+        try:
+            employees = DigitalEmployeeRepository.get_all(enabled_only=True)
+            for emp in employees:
+                emp_dict = dict(emp) if hasattr(emp, 'keys') else emp
+                emp_name = emp_dict.get("name", "").lower()
+                trigger = emp_dict.get("trigger_word", "").lower()
+                # 匹配名称或触发词
+                if skill_name in (emp_name, trigger):
+                    # 获取绑定的技能 Prompt
+                    skills_json = emp_dict.get("skills", "[]")
+                    try:
+                        bound_skills = json.loads(skills_json) if isinstance(skills_json, str) else skills_json
+                    except (json.JSONDecodeError, TypeError):
+                        bound_skills = []
+                    # 查找技能详细 Prompt
+                    skill_prompt_text = ""
+                    if AiSkillRepository and bound_skills:
+                        for sid in bound_skills:
+                            try:
+                                skill = AiSkillRepository.get_by_id(int(sid))
+                                if skill:
+                                    skill_prompt_text += f"\n【技能：{skill['name']}】{skill.get('prompt_template', '')}"
+                            except (ValueError, Exception):
+                                pass
+
+                    welcome = emp_dict.get("welcome_message", "")
+                    role = emp_dict.get("role_desc", "")
+                    system_prompt = (
+                        f"你是 {emp_dict.get('name', skill_name)}，一个 AI 数字员工。\n"
+                        f"角色定位：{role}\n"
+                    )
+                    if welcome:
+                        system_prompt += f"欢迎语风格参考：{welcome}\n"
+                    if skill_prompt_text:
+                        system_prompt += f"能力范围：{skill_prompt_text}\n"
+                    system_prompt += f"\n用户对你说：{skill_args}\n"
+                    system_prompt += f"请以「{emp_dict.get('name', skill_name)}」的身份和风格回复，保持友好、专业。"
+                    return system_prompt, emp_dict.get("name", skill_name)
+        except Exception:
+            pass
+
+    # 2. 从数据库查找匹配的技能（AiSkill）
+    if AiSkillRepository:
+        try:
+            all_skills = AiSkillRepository.get_all(enabled_only=True)
+            for sk in all_skills:
+                sk_dict = dict(sk) if hasattr(sk, 'keys') else sk
+                sk_name = sk_dict.get("name", "").lower()
+                keywords = sk_dict.get("trigger_keywords", "")
+                # 匹配技能名称或触发关键词
+                if skill_name == sk_name or skill_name in (keywords or "").split(","):
+                    prompt = sk_dict.get("prompt_template", "")
+                    system_prompt = (
+                        f"你是 {sk_dict.get('name', skill_name)} 数字员工。\n"
+                        f"技能描述：{sk_dict.get('description', '')}\n"
+                        f"{prompt}\n\n"
+                        f"用户输入：{skill_args}\n"
+                    )
+                    return system_prompt, sk_dict.get("name", skill_name)
+        except Exception:
+            pass
+
+    # 3. 回退：内置硬编码技能
     skill_prompts = {
         "天气": (
             "你是一个天气查询数字员工。用户询问天气情况。\n"
@@ -365,7 +582,7 @@ def _get_skill_prompt(skill_name: str, skill_args: str) -> str:
             "- @天气 <地点> — 查询天气信息\n"
             "- @音乐 <歌手/歌曲> — 音乐推荐与介绍\n"
             "- @西师妹 <内容> — 与西师妹 AI 伙伴聊天\n"
-            "- @search 或反斜杠search <关键词> — 搜索网络信息\n"
+            "- @search 或 \\search <关键词> — 搜索网络信息\n"
             "用户输入 @help 即可查看此列表。"
         ),
     }

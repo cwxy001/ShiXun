@@ -235,6 +235,21 @@ def init_db():
 					)
 			"""
 			)
+		# 网络搜索日志表
+		conn.execute(
+			"""
+				CREATE TABLE IF NOT EXISTS web_search_logs(
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						query TEXT NOT NULL,
+						result_count INTEGER DEFAULT 0,
+						source TEXT DEFAULT 'fallback',
+						source_urls TEXT DEFAULT '',
+						user TEXT DEFAULT '',
+						duration_ms INTEGER DEFAULT 0,
+						created_at TEXT NOT NULL DEFAULT (datetime('now'))
+					)
+			"""
+			)
 		# 接口管理表
 		conn.execute(
 			"""

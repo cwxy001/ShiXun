@@ -33,7 +33,7 @@ from app.controllers.deep_collect import (
     DeepCollectListHandler, DeepCollectSSEHandler, DeepCollectDetailHandler,
 )
 from app.controllers.web_auth import WebLoginHandler, WebRegisterHandler, WebLogoutHandler
-from app.controllers.web_chat import ChatPageHandler, ChatSSEHandler, ChatHistoryHandler, ChatDeleteHandler
+from app.controllers.web_chat import ChatPageHandler, ChatSSEHandler, ChatHistoryHandler, ChatDeleteHandler, ChatEmployeesHandler
 from app.controllers.api_manage import (
     ApiListHandler, ApiAddHandler, ApiEditHandler, ApiDeleteHandler,
     ApiDebugHandler, ApiDebugPageHandler, ApiStatsHandler,
@@ -66,6 +66,10 @@ from app.controllers.system_settings import (
     SystemStatusHandler, SystemStatusJsonHandler,
     OperationLogHandler, OperationLogClearHandler, OperationLogExportHandler,
 )
+from app.controllers.search_enhance import (
+    SearchLogHandler, SearchLogClearHandler, SearchLogExportHandler,
+    SearchCacheClearHandler, SearchTestHandler,
+)
 
 # 数据库初始化 & 种子数据
 from app.models.db import init_db, seed_admin, seed_roles_and_functions, seed_model_engines, seed_watch_sources
@@ -93,6 +97,7 @@ def create_app():
             ("/chat/sse", ChatSSEHandler),
             ("/chat/history", ChatHistoryHandler),
             ("/chat/delete", ChatDeleteHandler),
+            ("/chat/employees", ChatEmployeesHandler),
             # 后台认证路由
             ("/admin/login", AdminLoginHandler),
             ("/admin/index", AdminIndexHandler),
@@ -200,6 +205,12 @@ def create_app():
             ("/admin/operation-logs", OperationLogHandler),
             ("/admin/operation-logs/clear", OperationLogClearHandler),
             ("/admin/operation-logs/export", OperationLogExportHandler),
+            # 网络搜索管理路由
+            ("/admin/search-logs", SearchLogHandler),
+            ("/admin/search-logs/clear", SearchLogClearHandler),
+            ("/admin/search-logs/export", SearchLogExportHandler),
+            ("/admin/search-cache/clear", SearchCacheClearHandler),
+            ("/admin/search-test", SearchTestHandler),
         ],
         # 静态文件配置
         static_path=os.path.join(PROJECT_ROOT, "app", "static"),

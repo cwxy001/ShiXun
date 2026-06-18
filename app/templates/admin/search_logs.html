@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}搜索日志 - 技能增强{% end %}
+{% block head %}
+<style>
+    .stats-row { display: flex; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .stat-card { background: #fff; border-radius: 12px; padding: 16px 20px; border: 1px solid #e5e7eb; display: flex; align-items: center; gap: 12px; flex: 1; min-width: 150px; }
+    .stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .stat-icon.purple { background: #f3e8ff; color: #8b5cf6; }
+    .stat-icon.blue { background: #eff6ff; color: #3b82f6; }
+    .stat-icon.green { background: #f0fdf4; color: #22c55e; }
+    .stat-icon.orange { background: #fff7ed; color: #f97316; }
+    .stat-icon.red { background: #fef2f2; color: #ef4444; }
+    .stat-num { font-size: 20px; font-weight: 700; color: #1e293b; }
+    .stat-label { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .filter-bar input { padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 13px; }
+    .filter-bar input[type="text"] { width: 200px; }
+    .filter-bar input[type="date"] { width: 135px; }
+    .table-card { background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; }
+    .table-card table { width: 100%; border-collapse: collapse; }
+    .table-card th { background: #f8fafc; padding: 10px 12px; font-size: 12px; color: #64748b; font-weight: 600; text-align: left; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+    .table-card td { padding: 9px 12px; font-size: 13px; color: #334155; border-bottom: 1px solid #f1f5f9; }
+    .table-card tr:hover td { background: #fafbfd; }
+    .badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; display: inline-block; }
+    .badge-live { background: #dcfce7; color: #16a34a; }
+    .badge-cache { background: #eff6ff; color: #3b82f6; }
+    .badge-fallback { background: #fef3c7; color: #d97706; }
+    .btn { padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px solid #e2e8f0; background: #fff; color: #475569; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s; white-space: nowrap; }
+    .btn:hover { background: #f1f5f9; }
+    .btn-primary { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
+    .btn-primary:hover { background: #3b5de7; }
+    .btn-danger { color: #ef4444; border-color: #fecaca; }
+    .btn-danger:hover { background: #fef2f2; }
+    .btn-purple { background: #8b5cf6; color: #fff; border-color: #8b5cf6; }
+    .tab-bar { display: flex; gap: 0; margin-bottom: 18px; border-bottom: 2px solid #e5e7eb; }
+    .tab-bar a { padding: 9px 20px; font-size: 13px; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+    .tab-bar a.active { color: #8b5cf6; border-bottom-color: #8b5cf6; font-weight: 600; }
+    .tab-bar a:hover { color: #8b5cf6; }
+</style>
+{% end %}
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-search me-2" style="color:#8b5cf6;"></i>技能增强 · 网络搜索</h2>
+    <p>网络搜索调用日志、统计与缓存管理。用户通过 @search 或 \search 指令触发。</p>
+</div>
+
+<div class="tab-bar">
+    <a href="/admin/search-logs" class="active"><i class="fas fa-list me-1"></i>搜索日志</a>
+    <a href="/admin/search-test"><i class="fas fa-flask me-1"></i>搜索测试</a>
+</div>
+
+<!-- 统计卡片 -->
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-icon purple"><i class="fas fa-search"></i></div>
+        <div><div class="stat-num">{{ stats['total'] }}</div><div class="stat-label">总搜索次数</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green"><i class="fas fa-globe"></i></div>
+        <div><div class="stat-num">{{ stats['live_count'] }}</div><div class="stat-label">实时搜索</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue"><i class="fas fa-link"></i></div>
+        <div><div class="stat-num">{{ stats['total_results'] }}</div><div class="stat-label">总搜索结果</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange"><i class="fas fa-clock"></i></div>
+        <div><div class="stat-num">{{ stats['avg_duration_ms'] }}ms</div><div class="stat-label">平均响应</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon red"><i class="fas fa-calendar-day"></i></div>
+        <div><div class="stat-num">{{ stats['today'] }}</div><div class="stat-label">今日搜索</div></div>
+    </div>
+</div>
+
+<!-- 筛选 -->
+<div class="filter-bar">
+    <input type="text" id="kwInput" placeholder="搜索关键词..." value="{{ keyword }}" onkeydown="if(event.key==='Enter')search()">
+    <input type="text" id="userInput2" placeholder="用户..." value="{{ user }}" onkeydown="if(event.key==='Enter')search()">
+    <input type="date" id="dateFrom" value="{{ date_from }}" onchange="search()">
+    <input type="date" id="dateTo" value="{{ date_to }}" onchange="search()">
+    <button onclick="search()" class="btn btn-primary"><i class="fas fa-search me-1"></i>搜索</button>
+    <a href="/admin/search-logs" class="btn"><i class="fas fa-redo me-1"></i>重置</a>
+    <a href="/admin/search-logs/export" class="btn"><i class="fas fa-download me-1"></i>导出 JSON</a>
+    <form method="post" action="/admin/search-logs/clear" style="display:inline;" onsubmit="return confirm('确定清空所有搜索日志吗？')">
+        <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-1"></i>清空日志</button>
+    </form>
+    <form method="post" action="/admin/search-cache/clear" style="display:inline;">
+        <button type="submit" class="btn btn-purple"><i class="fas fa-eraser me-1"></i>清除缓存</button>
+    </form>
+</div>
+
+<!-- 日志表格 -->
+<div class="table-card">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>搜索关键词</th>
+                <th>结果数</th>
+                <th>来源</th>
+                <th>来源 URL</th>
+                <th>用户</th>
+                <th>耗时</th>
+                <th>时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in list %}
+            <tr>
+                <td style="font-size:12px;color:#94a3b8;">#{{ r['id'] }}</td>
+                <td style="font-weight:500;">{{ r['query'] }}</td>
+                <td style="text-align:center;">{{ r['result_count'] }}</td>
+                <td>
+                    <span class="badge badge-{{ r['source'] }}">
+                        {% if r['source'] == 'live' %}实时{% elif r['source'] == 'cache' %}缓存{% elif r['source'] == 'fallback' %}回退{% else %}{{ r['source'] }}{% end %}
+                    </span>
+                </td>
+                <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                    {{ r['source_urls'][:80] or '-' }}
+                </td>
+                <td>{{ r['user'] or '-' }}</td>
+                <td style="font-size:12px;">{{ r['duration_ms'] }}ms</td>
+                <td style="font-size:12px;color:#94a3b8;white-space:nowrap;">{{ r['created_at'] }}</td>
+            </tr>
+            {% end %}
+            {% if not list %}
+            <tr><td colspan="8" style="text-align:center;padding:48px;color:#94a3b8;">
+                <i class="fas fa-search" style="font-size:40px;display:block;margin-bottom:12px;"></i>
+                暂无搜索日志
+            </td></tr>
+            {% end %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+<div style="text-align:center;margin-top:20px;">
+    {% set sp = page - 2 %}{% if sp < 1 %}{% set sp = 1 %}{% end %}
+    {% set ep = sp + 4 %}{% if ep > total_pages %}{% set ep = total_pages %}{% set sp = ep - 4 %}{% end %}
+    {% if sp < 1 %}{% set sp = 1 %}{% end %}
+    {% set bp = '' %}{% if keyword %}{% set bp = bp + '&keyword=' + keyword %}{% end %}
+    {% if user %}{% set bp = bp + '&user=' + user %}{% end %}
+    {% if date_from %}{% set bp = bp + '&date_from=' + date_from %}{% end %}
+    {% if date_to %}{% set bp = bp + '&date_to=' + date_to %}{% end %}
+    {% if sp > 1 %}<a href="?page=1{{ bp }}" class="btn">&laquo;</a><a href="?page={{ page - 1 }}{{ bp }}" class="btn">&lsaquo;</a>{% end %}
+    {% for p in range(sp, ep + 1) %}<a href="?page={{ p }}{{ bp }}" class="btn {% if p == page %}btn-primary{% end %}">{{ p }}</a>{% end %}
+    {% if ep < total_pages %}<a href="?page={{ page + 1 }}{{ bp }}" class="btn">&rsaquo;</a><a href="?page={{ total_pages }}{{ bp }}" class="btn">&raquo;</a>{% end %}
+</div>
+{% end %}
+
+<script>
+function search() {
+    const p = [];
+    const kw = document.getElementById('kwInput').value.trim();
+    const us = document.getElementById('userInput2').value.trim();
+    const df = document.getElementById('dateFrom').value;
+    const dt = document.getElementById('dateTo').value;
+    if (kw) p.push('keyword=' + encodeURIComponent(kw));
+    if (us) p.push('user=' + encodeURIComponent(us));
+    if (df) p.push('date_from=' + df);
+    if (dt) p.push('date_to=' + dt);
+    location.href = '/admin/search-logs' + (p.length ? '?' + p.join('&') : '');
+}
+</script>
+{% end %}

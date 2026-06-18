@@ -394,6 +394,55 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+
+        /* @mention 下拉建议 */
+        .mention-dropdown {
+            position: absolute; bottom: 100%; left: 0;
+            margin-bottom: 6px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+            max-height: 240px; overflow-y: auto;
+            min-width: 240px;
+            display: none; z-index: 300;
+        }
+        .mention-dropdown.show { display: block; }
+        .mention-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+        .mention-item:first-child { border-radius: 10px 10px 0 0; }
+        .mention-item:last-child { border-radius: 0 0 10px 10px; }
+        .mention-item:hover, .mention-item.active { background: #eef2ff; }
+        .mention-item .m-avatar {
+            width: 32px; height: 32px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; color: #fff; flex-shrink: 0;
+            background: linear-gradient(135deg, #4a6cf7, #6366f1);
+        }
+        .mention-item .m-info { flex: 1; min-width: 0; }
+        .mention-item .m-name { font-weight: 600; color: #1e293b; }
+        .mention-item .m-role { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mention-item .m-trigger { font-size: 11px; color: #4a6cf7; background: #eef2ff; padding: 1px 8px; border-radius: 10px; flex-shrink: 0; }
+        .mention-empty { padding: 16px; text-align: center; color: #94a3b8; font-size: 12px; }
+
+        /* 员工头像在气泡中 */
+        .employee-header {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 8px; padding-bottom: 8px;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+        .employee-header .emp-avatar-sm {
+            width: 24px; height: 24px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; color: #fff; flex-shrink: 0;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+        .employee-header .emp-name { font-size: 13px; font-weight: 600; color: #475569; }
     </style>
 </head>
 <body>
@@ -485,7 +534,8 @@
         </div>
 
         <div class="chat-input-area">
-            <div class="input-wrapper">
+            <div class="input-wrapper" style="position:relative;">
+                <div class="mention-dropdown" id="mentionDropdown"></div>
                 <textarea id="userInput" rows="1" placeholder="输入您的问题，按 Enter 发送，Shift+Enter 换行"
                     onkeydown="handleKeyDown(event)"></textarea>
                 <button class="btn-send" id="btnSend" onclick="sendMessage()" title="发送">
@@ -503,6 +553,9 @@
     let currentConvId = {{ conv_id if conv_id else 0 }};
     let isStreaming = false;
     let streamBuffer = '';
+    let employees = [];          // 数字员工缓存
+    let mentionActive = false;   // @mention 下拉状态
+    let mentionIdx = -1;         // 当前选中项索引
 
     // ================= 侧栏切换 =================
     function toggleSidebar() {
@@ -610,10 +663,117 @@
 
     // ================= 发送消息 =================
     function handleKeyDown(e) {
+        // @mention 下拉导航
+        if (mentionActive) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                mentionIdx = Math.min(mentionIdx + 1, mentionFiltered.length - 1);
+                renderMentionDropdown(mentionFiltered);
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                mentionIdx = Math.max(mentionIdx - 1, 0);
+                renderMentionDropdown(mentionFiltered);
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                if (mentionIdx >= 0 && mentionIdx < mentionFiltered.length) {
+                    selectMention(mentionFiltered[mentionIdx]);
+                }
+                return;
+            }
+            if (e.key === 'Escape') {
+                closeMention();
+                return;
+            }
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
         }
+    }
+
+    // ================= @mention 自动补全 =================
+    let mentionFiltered = [];
+    let mentionStartPos = 0;
+
+    function fetchEmployees() {
+        fetch('/chat/employees')
+            .then(r => r.json())
+            .then(data => {
+                if (data.employees) employees = data.employees;
+            })
+            .catch(() => {});
+    }
+
+    function openMentionDropdown(filtered, startPos) {
+        mentionFiltered = filtered;
+        mentionStartPos = startPos;
+        mentionActive = true;
+        mentionIdx = 0;
+        renderMentionDropdown(filtered);
+    }
+
+    function closeMention() {
+        mentionActive = false;
+        mentionIdx = -1;
+        document.getElementById('mentionDropdown').classList.remove('show');
+    }
+
+    function renderMentionDropdown(filtered) {
+        const dd = document.getElementById('mentionDropdown');
+        if (!filtered || filtered.length === 0) {
+            dd.innerHTML = '<div class="mention-empty">暂无匹配的数字员工</div>';
+            dd.classList.add('show');
+            return;
+        }
+        dd.innerHTML = filtered.map((emp, i) => {
+            const avatarHtml = emp.avatar
+                ? `<img src="${escapeHtml(emp.avatar)}" class="m-avatar" style="object-fit:cover;">`
+                : `<div class="m-avatar"><i class="fas fa-robot"></i></div>`;
+            const activeCls = i === mentionIdx ? ' active' : '';
+            return `<div class="mention-item${activeCls}" data-idx="${i}" onmousedown="event.preventDefault();selectMention(mentionFiltered[${i}])">
+                ${avatarHtml}
+                <div class="m-info">
+                    <div class="m-name">${escapeHtml(emp.name)}</div>
+                    <div class="m-role">${escapeHtml(emp.role || '数字员工')}</div>
+                </div>
+                <span class="m-trigger">@${escapeHtml(emp.trigger || emp.name)}</span>
+            </div>`;
+        }).join('');
+        dd.classList.add('show');
+        // 滚动到选中项
+        const activeEl = dd.querySelector('.mention-item.active');
+        if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+    }
+
+    function selectMention(emp) {
+        const input = document.getElementById('userInput');
+        const before = input.value.substring(0, mentionStartPos);
+        const trigger = emp.trigger || emp.name;
+        input.value = before + '@' + trigger + ' ';
+        closeMention();
+        input.focus();
+        // 将光标移到末尾
+        input.selectionStart = input.selectionEnd = input.value.length;
+    }
+
+    function extractMentionQuery(value, cursorPos) {
+        // 找到光标前最近的 @
+        let atPos = -1;
+        for (let i = cursorPos - 1; i >= 0; i--) {
+            if (value[i] === '@') { atPos = i; break; }
+            if (value[i] === ' ' || value[i] === '\n') break;
+        }
+        if (atPos < 0) return null;
+        const query = value.substring(atPos + 1, cursorPos);
+        // 只匹配中文、英文、数字，不含空格
+        if (/^[\u4e00-\u9fa5a-zA-Z0-9]*$/.test(query)) {
+            return { query: query.toLowerCase(), startPos: atPos };
+        }
+        return null;
     }
 
     function sendMessage() {
@@ -697,12 +857,19 @@
                                         refreshConvList();
                                     }
                                 } else if (data.type === 'skill_start') {
-                                    // 显示数字员工调用横幅
+                                    // 显示数字员工调用横幅（含员工信息）
+                                    const avatarEl = data.avatar
+                                        ? `<img src="${data.avatar}" style="width:22px;height:22px;border-radius:6px;object-fit:cover;">`
+                                        : '<i class="fas fa-robot"></i>';
                                     bubble.innerHTML = `
                                         <div class="skill-banner">
                                             <i class="fas fa-circle-notch skill-spinner"></i>
-                                            <span class="skill-badge">@${data.skill}</span>
-                                            <span>${data.content}</span>
+                                            <span style="display:flex;align-items:center;gap:5px;">
+                                                <span class="skill-badge" style="display:flex;align-items:center;gap:4px;">
+                                                    ${avatarEl} @${escapeHtml(data.display_name || data.skill)}
+                                                </span>
+                                            </span>
+                                            <span>${escapeHtml(data.content)}</span>
                                         </div>
                                     `;
                                 } else if (data.type === 'done') {
@@ -712,12 +879,15 @@
                                     }
                                     if (data.skill) {
                                         // 技能调用结束，追加完成标记
+                                        const avatarEl2 = data.avatar
+                                            ? `<img src="${data.avatar}" style="width:18px;height:18px;border-radius:4px;object-fit:cover;">`
+                                            : '<i class="fas fa-robot"></i>';
                                         const doneMark = document.createElement('div');
                                         doneMark.className = 'skill-banner';
                                         doneMark.style.background = '#f0fdf4';
                                         doneMark.style.borderColor = '#86efac';
                                         doneMark.style.color = '#166534';
-                                        doneMark.innerHTML = `<i class="fas fa-check-circle"></i> <span class="skill-badge" style="background:#22c55e;">@${data.skill}</span> <span>数字员工任务完成</span>`;
+                                        doneMark.innerHTML = `<i class="fas fa-check-circle"></i> <span class="skill-badge" style="background:#22c55e;display:flex;align-items:center;gap:3px;">${avatarEl2} @${escapeHtml(data.display_name || data.skill)}</span> <span>数字员工任务完成</span>`;
                                         bubble.parentElement.appendChild(doneMark);
                                     }
                                 } else if (data.type === 'error') {
@@ -802,10 +972,39 @@
     }
 
     // 自动调整输入框高度
-    document.getElementById('userInput').addEventListener('input', function() {
+    const inputEl = document.getElementById('userInput');
+    inputEl.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 160) + 'px';
+
+        // @mention 检测
+        const cursorPos = this.selectionStart;
+        const mq = extractMentionQuery(this.value, cursorPos);
+        if (mq) {
+            const filtered = employees.filter(emp => {
+                const name = (emp.name || '').toLowerCase();
+                const trigger = (emp.trigger || '').toLowerCase();
+                return name.includes(mq.query) || trigger.includes(mq.query);
+            });
+            if (filtered.length > 0 || mq.query.length === 0) {
+                openMentionDropdown(filtered, mq.startPos);
+            } else {
+                openMentionDropdown([], mq.startPos);
+            }
+        } else {
+            closeMention();
+        }
     });
+
+    // 点击其他地方关闭下拉
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.mention-dropdown') && !e.target.closest('#userInput')) {
+            closeMention();
+        }
+    });
+
+    // 加载数字员工列表
+    fetchEmployees();
 
     // 初始滚动到底部
     scrollBottom();
