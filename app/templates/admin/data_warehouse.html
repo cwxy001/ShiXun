@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+
+{% block title %}数据仓库{% end %}
+
+{% block head %}
+<style>
+    .filter-bar {
+        display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+        background: #fff; border-radius: 10px; padding: 16px 20px;
+        margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-group label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .filter-group input, .filter-group select {
+        padding: 8px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+        font-size: 13px; outline: none; transition: border-color 0.2s;
+        background: #fff; min-width: 140px;
+    }
+    .filter-group input:focus, .filter-group select:focus { border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,0.08); }
+    .btn-filter {
+        padding: 9px 20px; border: none; border-radius: 8px;
+        background: #4a6cf7; color: #fff; font-size: 13px; font-weight: 700;
+        cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .btn-filter:hover { background: #3b5de7; }
+    .btn-reset {
+        padding: 9px 16px; border: 1px solid #e2e8f0; border-radius: 8px;
+        background: #fff; color: #64748b; font-size: 13px; font-weight: 600;
+        text-decoration: none; display: flex; align-items: center; gap: 4px;
+    }
+    .btn-reset:hover { background: #f8fafc; }
+
+    .toolbar {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 12px; gap: 12px;
+    }
+    .stats { font-size: 13px; color: #64748b; font-weight: 600; }
+    .batch-actions { display: flex; gap: 8px; }
+    .btn-batch {
+        padding: 7px 16px; border-radius: 8px; border: 1px solid #e2e8f0;
+        background: #fff; font-size: 12px; font-weight: 700; cursor: pointer;
+        display: flex; align-items: center; gap: 5px; transition: all 0.15s;
+    }
+    .btn-batch:hover { background: #f8fafc; }
+    .btn-batch.danger { border-color: #fecaca; color: #ef4444; }
+    .btn-batch.danger:hover { background: #fef2f2; }
+    .btn-batch.ai-entry {
+        background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        color: #fff; border: none; padding: 7px 18px;
+    }
+    .btn-batch.ai-entry:hover { box-shadow: 0 4px 16px rgba(139,92,246,0.35); }
+
+    /* 表格样式 */
+    .table-wrap { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow-x: auto; margin-bottom: 16px; }
+    .table-wrap table { width: 100%; border-collapse: collapse; }
+    .table-wrap th {
+        padding: 12px 14px; font-size: 12px; font-weight: 700; color: #64748b;
+        text-align: left; background: #f8fafc; border-bottom: 2px solid #e5e7eb;
+        white-space: nowrap;
+    }
+    .table-wrap td {
+        padding: 11px 14px; font-size: 13px; color: #334155;
+        border-bottom: 1px solid #f1f5f9; vertical-align: middle;
+    }
+    .table-wrap tbody tr { transition: background 0.12s; }
+    .table-wrap tbody tr:hover { background: #f8fafc; }
+    .table-wrap tbody tr.selected { background: #eff6ff; }
+    .td-title { font-weight: 600; color: #0f172a; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .td-title a { color: #0f172a; text-decoration: none; }
+    .td-title a:hover { color: #4a6cf7; }
+    .td-snippet { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #94a3b8; font-size: 12px; }
+    .td-tag {
+        display: inline-block; padding: 2px 8px; border-radius: 12px;
+        font-size: 11px; font-weight: 700; background: #f1f5f9; color: #64748b;
+    }
+    .td-time { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+
+    .btn-row {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0;
+        background: #fff; font-size: 11px; font-weight: 600; cursor: pointer;
+        transition: all 0.12s;
+    }
+    .btn-row.del { color: #ef4444; border-color: #fecaca; }
+    .btn-row.del:hover { background: #fef2f2; }
+    .btn-row.ai { color: #7c3aed; border-color: #ddd6fe; }
+    .btn-row.ai:hover { background: #f5f3ff; }
+    .btn-row.link { color: #059669; border-color: #a7f3d0; }
+    .btn-row.link:hover { background: #ecfdf5; }
+
+    .select-all-cell { width: 36px; text-align: center; }
+    .checkbox-custom {
+        width: 16px; height: 16px; accent-color: #4a6cf7; cursor: pointer;
+    }
+
+    .empty-box { text-align: center; padding: 48px 16px; color: #94a3b8; }
+    .empty-box i { font-size: 36px; display: block; margin-bottom: 10px; opacity: 0.3; }
+
+    .pagination-bar {
+        display: flex; justify-content: center; align-items: center;
+        gap: 4px; margin-top: 20px;
+    }
+    .pagination-bar a, .pagination-bar span {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 34px; height: 34px; border-radius: 8px;
+        font-size: 13px; font-weight: 600; text-decoration: none;
+    }
+    .pagination-bar a { border: 1px solid #e2e8f0; color: #475569; }
+    .pagination-bar a:hover { background: #f1f5f9; }
+    .pagination-bar a.active { background: linear-gradient(135deg, #4a6cf7, #6366f1); border: none; color: #fff; }
+    .pagination-bar span { color: #94a3b8; }
+
+    /* 深度采集状态标识 */
+    .badge-deep {
+        display: inline-flex; align-items: center; gap: 3px;
+        padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;
+    }
+    .badge-deep.done { background: #d1fae5; color: #065f46; }
+    .badge-deep.pending { background: #f1f5f9; color: #94a3b8; }
+
+    /* 采集进度面板 */
+    .progress-overlay {
+        display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+        z-index: 1000; align-items: center; justify-content: center;
+    }
+    .progress-overlay.show { display: flex; }
+    .progress-panel {
+        background: #fff; border-radius: 14px; width: 520px; max-height: 70vh;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden;
+    }
+    .progress-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 20px; border-bottom: 1px solid #e5e7eb;
+    }
+    .progress-header h4 { font-size: 15px; font-weight: 700; color: #1e293b; margin: 0; }
+    .progress-body { padding: 16px 20px; max-height: 50vh; overflow-y: auto; }
+    .progress-bar-wrap {
+        height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; margin-bottom: 14px;
+    }
+    .progress-fill {
+        height: 100%; background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        border-radius: 4px; transition: width 0.3s ease;
+    }
+    .log-list { list-style: none; padding: 0; margin: 0; }
+    .log-list li {
+        padding: 6px 0; font-size: 12px; color: #475569; border-bottom: 1px solid #f8fafc;
+        display: flex; align-items: flex-start; gap: 6px;
+    }
+    .log-list li i { margin-top: 2px; font-size: 11px; }
+    .log-list li .ok { color: #059669; }
+    .log-list li .err { color: #ef4444; }
+    .log-list li .warn { color: #d97706; }
+    .stat-row {
+        display: flex; justify-content: space-around; padding: 14px 0;
+        border-top: 1px solid #e5e7eb; margin-top: 8px;
+    }
+    .stat-item { text-align: center; }
+    .stat-val { font-size: 22px; font-weight: 700; }
+    .stat-val.green { color: #059669; }
+    .stat-val.red { color: #ef4444; }
+    .stat-label { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .btn-close-panel {
+        padding: 7px 20px; border-radius: 8px; border: none;
+        background: #4a6cf7; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+</style>
+{% end %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-database me-2" style="color:#7c3aed;"></i>数据仓库</h2>
+    <p>管理瞭望采集的数据结果，支持筛选、删除和 AI 深度采集</p>
+</div>
+
+<!-- 筛选栏 -->
+<div class="filter-bar">
+    <form action="/admin/data-warehouse" method="get" style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; width:100%;">
+        <div class="filter-group">
+            <label><i class="fas fa-search" style="font-size:10px;"></i> 关键词</label>
+            <input type="text" name="keyword" value="{{ keyword }}" placeholder="搜索标题/摘要/关键词...">
+        </div>
+        <div class="filter-group">
+            <label><i class="fas fa-tag" style="font-size:10px;"></i> 数据来源</label>
+            <select name="source">
+                <option value="">全部来源</option>
+                {% for s in sources %}
+                <option value="{{ s }}"{% if source == s %} selected{% end %}>{{ s }}</option>
+                {% end %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label><i class="fas fa-calendar" style="font-size:10px;"></i> 起始日期</label>
+            <input type="date" name="date_from" value="{{ date_from }}">
+        </div>
+        <div class="filter-group">
+            <label><i class="fas fa-calendar" style="font-size:10px;"></i> 截止日期</label>
+            <input type="date" name="date_to" value="{{ date_to }}">
+        </div>
+        <button type="submit" class="btn-filter"><i class="fas fa-filter"></i>筛选</button>
+        <a href="/admin/data-warehouse" class="btn-reset"><i class="fas fa-redo-alt"></i>重置</a>
+    </form>
+</div>
+
+<!-- 工具栏 -->
+<div class="toolbar">
+    <div class="stats">共 {{ total }} 条记录{% if keyword or source or date_from or date_to %}（已筛选）{% end %}</div>
+    <div class="batch-actions">
+        <button class="btn-batch ai-entry" onclick="batchDeep()" id="batchAIBtn" disabled>
+            <i class="fas fa-robot"></i> AI 深度采集
+        </button>
+        <button class="btn-batch danger" onclick="batchDelete()" id="batchDelBtn" disabled>
+            <i class="fas fa-trash-alt"></i> 批量删除
+        </button>
+    </div>
+</div>
+
+<!-- 数据表格 -->
+<div class="table-wrap">
+    <form id="batchForm" method="post" action="/admin/data-warehouse/batch-delete">
+        <input type="hidden" name="ids" id="batchIds">
+    </form>
+    <table>
+        <thead>
+            <tr>
+                <th class="select-all-cell">
+                    <input type="checkbox" class="checkbox-custom" id="selectAll" onchange="toggleAll(this)">
+                </th>
+                <th>ID</th>
+                <th>标题</th>
+                <th>摘要</th>
+                <th>关键词</th>
+                <th>数据来源</th>
+                <th>深度采集</th>
+                <th>采集时间</th>
+                <th style="width:140px;">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if list and len(list) > 0 %}
+                {% for item in list %}
+                <tr id="row-{{ item['id'] }}">
+                    <td class="select-all-cell">
+                        <input type="checkbox" class="checkbox-custom row-check" value="{{ item['id'] }}" onchange="updateButtons()">
+                    </td>
+                    <td style="font-size:11px; color:#94a3b8;">{{ item["id"] }}</td>
+                    <td class="td-title">
+                        {% if item["url"] %}
+                        <a href="{{ item['url'] }}" target="_blank" title="{{ item['title'] }}">{{ item["title"] or "无标题" }}</a>
+                        {% else %}
+                        <span title="{{ item['title'] }}">{{ item["title"] or "无标题" }}</span>
+                        {% end %}
+                    </td>
+                    <td class="td-snippet" title="{{ item['snippet'] }}">{{ item["snippet"] or "-" }}</td>
+                    <td><span class="td-tag">{{ item["keyword"] or "-" }}</span></td>
+                    <td><span class="td-tag" style="background:#ede9fe;color:#7c3aed;">{{ item["source_name"] or "-" }}</span></td>
+                    <td>
+                        {% if item["id"] in deep_status_map and deep_status_map[item["id"]]["status"] in ("success", "fail") %}
+                        <span class="badge-deep done"><i class="fas fa-check-circle"></i> 已深度采集</span>
+                        {% else %}
+                        <span class="badge-deep pending"><i class="fas fa-hourglass-half"></i> 未深度采集</span>
+                        {% end %}
+                    </td>
+                    <td class="td-time">{{ item["collected_at"] }}</td>
+                    <td>
+                        <div style="display:flex; gap:4px;">
+                            {% if item["url"] %}
+                            <a href="{{ item['url'] }}" target="_blank" class="btn-row link" title="查看原文">
+                                <i class="fas fa-external-link-alt"></i> 原文
+                            </a>
+                            {% end %}
+                            {% if item["id"] in deep_status_map and deep_status_map[item["id"]]["status"] in ("success", "fail") %}
+                            <a href="/admin/deep-collect/detail/{{ item['id'] }}" class="btn-row" style="color:#2563eb;border-color:#bfdbfe;" title="查看深度采集详情">
+                                <i class="fas fa-file-alt"></i> 详情
+                            </a>
+                            {% else %}
+                            <button class="btn-row ai" onclick="startDeep(['{{ item['id'] }}'])" title="AI 深度采集">
+                                <i class="fas fa-brain"></i> AI
+                            </button>
+                            {% end %}
+                            <form action="/admin/data-warehouse/delete" method="post" style="display:inline;" onsubmit="return confirm('确认删除该记录？');">
+                                <input type="hidden" name="id" value="{{ item['id'] }}">
+                                <input type="hidden" name="next" value="/admin/data-warehouse?page={{ page }}{% if keyword %}&keyword={{ keyword }}{% end %}{% if source %}&source={{ source }}{% end %}{% if date_from %}&date_from={{ date_from }}{% end %}{% if date_to %}&date_to={{ date_to }}{% end %}">
+                                <button type="submit" class="btn-row del"><i class="fas fa-trash"></i> 删除</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% end %}
+            {% else %}
+                <tr>
+                    <td colspan="9" class="empty-box">
+                        <i class="fas fa-database"></i>
+                        <p>{{ "未找到匹配的数据，请调整筛选条件" if keyword or source or date_from or date_to else "数据仓库暂无数据，请先在瞭望采集页进行采集" }}</p>
+                    </td>
+                </tr>
+            {% end %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 分页 -->
+{% if total_pages > 1 %}
+<div class="pagination-bar">
+    {% if page > 1 %}
+    <a href="/admin/data-warehouse?page={{ page - 1 }}{% if keyword %}&keyword={{ keyword }}{% end %}{% if source %}&source={{ source }}{% end %}{% if date_from %}&date_from={{ date_from }}{% end %}{% if date_to %}&date_to={{ date_to }}{% end %}"><i class="fas fa-chevron-left"></i></a>
+    {% end %}
+
+    {% set start_p = page - 2 %}
+    {% if start_p < 1 %}{% set start_p = 1 %}{% end %}
+    {% set end_p = start_p + 4 %}
+    {% if end_p > total_pages %}{% set end_p = total_pages %}{% end %}
+    {% if start_p > 1 %}<a href="/admin/data-warehouse?page=1">1</a><span>...</span>{% end %}
+
+    {% for p in range(start_p, end_p + 1) %}
+        {% if p == page %}
+        <a class="active" href="#">{{ p }}</a>
+        {% else %}
+        <a href="/admin/data-warehouse?page={{ p }}{% if keyword %}&keyword={{ keyword }}{% end %}{% if source %}&source={{ source }}{% end %}{% if date_from %}&date_from={{ date_from }}{% end %}{% if date_to %}&date_to={{ date_to }}{% end %}">{{ p }}</a>
+        {% end %}
+    {% end %}
+
+    {% if end_p < total_pages %}<span>...</span><a href="/admin/data-warehouse?page={{ total_pages }}">{{ total_pages }}</a>{% end %}
+
+    {% if page < total_pages %}
+    <a href="/admin/data-warehouse?page={{ page + 1 }}{% if keyword %}&keyword={{ keyword }}{% end %}{% if source %}&source={{ source }}{% end %}{% if date_from %}&date_from={{ date_from }}{% end %}{% if date_to %}&date_to={{ date_to }}{% end %}"><i class="fas fa-chevron-right"></i></a>
+    {% end %}
+</div>
+{% end %}
+{% end %}
+
+{% block script %}
+<script>
+function toggleAll(cb) {
+    document.querySelectorAll('.row-check').forEach(c => { c.checked = cb.checked; });
+    updateButtons();
+}
+function updateButtons() {
+    const checked = document.querySelectorAll('.row-check:checked').length;
+    document.getElementById('batchDelBtn').disabled = checked === 0;
+    document.getElementById('batchDelBtn').innerHTML = `<i class="fas fa-trash-alt"></i> 批量删除${checked ? ' (' + checked + ')' : ''}`;
+    const aiBtn = document.getElementById('batchAIBtn');
+    if (aiBtn) {
+        aiBtn.disabled = checked === 0;
+        aiBtn.innerHTML = `<i class="fas fa-robot"></i> AI 深度采集${checked ? ' (' + checked + ')' : ''}`;
+    }
+    updateBatchBtn();
+}
+function updateBatchBtn() {
+    const checked = document.querySelectorAll('.row-check:checked').length;
+    document.getElementById('batchDelBtn').disabled = checked === 0;
+    document.getElementById('batchDelBtn').innerHTML = `<i class="fas fa-trash-alt"></i> 批量删除${checked ? ' (' + checked + ')' : ''}`;
+}
+function batchDelete() {
+    const ids = [...document.querySelectorAll('.row-check:checked')].map(c => c.value);
+    if (!ids.length) return;
+    if (!confirm(`确认删除选中的 ${ids.length} 条记录？此操作不可撤销。`)) return;
+    document.getElementById('batchIds').value = ids.join(',');
+    document.getElementById('batchForm').submit();
+}
+
+/* ---- 深度采集 SSE ---- */
+function startDeep(ids) {
+    showPanel();
+    addLog('info', `开始深度采集，共 ${ids.length} 条`);
+    updateProgress(0);
+    const es = new EventSource('/admin/deep-collect/sse');
+    // Use fetch+stream for POST SSE
+    es.close();
+    fetchSSE(ids);
+}
+
+async function fetchSSE(ids) {
+    const resp = await fetch('/admin/deep-collect/sse', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: ids})
+    });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let stats = {success:0, fail:0, total:ids.length, current:0};
+
+    while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, {stream: true});
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        let dataStr = '';
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                dataStr += line.slice(6);
+            } else if (line === '' && dataStr) {
+                try {
+                    const data = JSON.parse(dataStr);
+                    handleSSE(data, stats);
+                } catch(e) {}
+                dataStr = '';
+            }
+        }
+    }
+}
+
+function handleSSE(data, stats) {
+    switch (data.type) {
+        case 'start':
+            stats.total = data.total;
+            document.getElementById('panelTitle').textContent =
+                `深度采集 (${data.mode === 'batch' ? '批量' : '单条'}${data.use_ai ? ' · AI分析' : ''})`;
+            break;
+        case 'progress':
+            stats.current = data.current;
+            updateProgress(Math.round(data.current / stats.total * 100));
+            document.getElementById('progressMsg').textContent =
+                `[${data.current}/${stats.total}] ${data.title || ''}`;
+            break;
+        case 'log':
+            addLog(data.level || 'info', data.message);
+            break;
+        case 'item_done':
+            if (data.status === 'success') stats.success++;
+            else stats.fail++;
+            addLog(data.status === 'success' ? 'ok' : 'err',
+                `[${stats.current}/${stats.total}] ${data.status === 'success' ? '完成' : '失败'}`
+                + (data.summary ? ' — ' + data.summary : '')
+                + (data.duration_ms ? ` (${data.duration_ms}ms)` : ''));
+            updateStats(stats);
+            break;
+        case 'all_done':
+            updateProgress(100);
+            document.getElementById('progressMsg').textContent = '采集完成';
+            addLog('ok', `全部完成：成功 ${stats.success}，失败 ${stats.fail}，耗时 ${(data.duration_ms/1000).toFixed(1)}s`);
+            updateStats(stats);
+            break;
+    }
+}
+
+function showPanel() {
+    document.getElementById('progressOverlay').classList.add('show');
+    document.getElementById('logList').innerHTML = '';
+    document.getElementById('statSuccess').textContent = '0';
+    document.getElementById('statFail').textContent = '0';
+    document.getElementById('statDuration').textContent = '0s';
+    updateProgress(0);
+    document.getElementById('progressMsg').textContent = '准备中...';
+    document.getElementById('closeBtn').style.display = 'none';
+    const startTime = Date.now();
+    document.getElementById('progressOverlay').dataset.start = startTime;
+}
+function closePanel() {
+    document.getElementById('progressOverlay').classList.remove('show');
+    location.reload();
+}
+function updateProgress(pct) {
+    document.getElementById('progressFill').style.width = pct + '%';
+}
+function addLog(level, msg) {
+    const icon = level === 'ok' ? 'fa-check-circle ok' : level === 'err' ? 'fa-times-circle err' : level === 'warn' ? 'fa-exclamation-triangle warn' : 'fa-info-circle';
+    const li = document.createElement('li');
+    li.innerHTML = `<i class="fas ${icon}"></i> ${msg}`;
+    const list = document.getElementById('logList');
+    list.appendChild(li);
+    list.scrollTop = list.scrollHeight;
+}
+function updateStats(stats) {
+    document.getElementById('statSuccess').textContent = stats.success;
+    document.getElementById('statFail').textContent = stats.fail;
+    const startTime = parseInt(document.getElementById('progressOverlay').dataset.start || 0);
+    if (startTime) {
+        document.getElementById('statDuration').textContent = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
+    }
+    if (stats.success + stats.fail >= stats.total) {
+        document.getElementById('closeBtn').style.display = '';
+        document.getElementById('progressMsg').textContent = '采集全部完成';
+    }
+}
+function batchDeep() {
+    const ids = [...document.querySelectorAll('.row-check:checked')].map(c => c.value);
+    if (!ids.length) { alert('请先勾选需要深度采集的数据'); return; }
+    startDeep(ids);
+}
+function singleAI(id) {
+    startDeep([id]);
+}
+</script>
+
+<!-- 进度面板 -->
+<div class="progress-overlay" id="progressOverlay">
+    <div class="progress-panel">
+        <div class="progress-header">
+            <h4 id="panelTitle"><i class="fas fa-robot me-2" style="color:#8b5cf6;"></i>深度采集</h4>
+        </div>
+        <div class="progress-body">
+            <div class="progress-bar-wrap">
+                <div class="progress-fill" id="progressFill" style="width:0%"></div>
+            </div>
+            <p style="font-size:12px;color:#64748b;margin-bottom:10px;" id="progressMsg">准备中...</p>
+            <ul class="log-list" id="logList"></ul>
+            <div class="stat-row">
+                <div class="stat-item">
+                    <div class="stat-val green" id="statSuccess">0</div>
+                    <div class="stat-label">成功</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-val red" id="statFail">0</div>
+                    <div class="stat-label">失败</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-val" style="color:#1e293b;" id="statDuration">0s</div>
+                    <div class="stat-label">耗时</div>
+                </div>
+            </div>
+            <div style="text-align:center;margin-top:10px;">
+                <button class="btn-close-panel" id="closeBtn" style="display:none;" onclick="closePanel()">
+                    <i class="fas fa-check me-1"></i> 关闭并刷新
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% end %}

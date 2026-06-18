@@ -48,18 +48,21 @@ IOIQ-System/
 │  │  ├─ model_engine.py   # 模型引擎控制器（CRUD + SSE 流式对话测试）
 │  │  ├─ watch_source.py   # 瞭望数据源控制器（采集规则 CRUD）
 │  │  ├─ watch_collect.py  # 瞭望采集控制器（采集执行 / SSE 流式 / 保存）
+│  │  ├─ data_warehouse.py # 数据仓库控制器（列表/筛选/删除/批量删除）
+│  │  ├─ deep_collect.py   # 深度采集控制器（SSE流式/单条+批量/详情查看）
 │  │  ├─ base.py           # 基础控制器（预留）
 │  │  ├─ home.py           # 首页控制器（预留）
 │  │  └─ auth.py           # 认证控制器（预留）
 │  ├─ models/              # 模型层（M）- 数据与业务逻辑
 │  │  ├─ __init__.py       # 模型包标识
-│  │  ├─ db.py             # 数据库连接管理 & 表初始化 & 种子数据（SQLite3，8张表）
+│  │  ├─ db.py             # 数据库连接管理 & 表初始化 & 种子数据（SQLite3，10张表）
 │  │  ├─ user.py           # 用户仓储类（CRUD、密码哈希验证）
 │  │  ├─ role.py           # 角色仓储类（CRUD、分页、功能权限分配）
 │  │  ├─ function.py       # 功能/菜单仓储类（CRUD、分页、树形结构）
 │  │  ├─ model_engine.py   # 模型引擎仓储类（CRUD、Token 统计、默认模型管理）
 │  │  ├─ watch_source.py   # 瞭望数据源仓储类（CRUD、分页搜索）
-│  │  └─ watch_result.py   # 瞭望采集结果仓储类（批量保存、分页搜索）
+│  │  ├─ watch_result.py   # 瞭望采集结果仓储类（批量保存、分页搜索）
+│  │  └─ deep_result.py    # 深度采集结果仓储类（CRUD、批量状态查询）
 │  ├─ templates/           # 视图层（V）- HTML 模板
 │  │  ├─ admin/            # 后台管理页面
 │  │  │  ├─ base.html      # 后台基础布局模板（ZUI 上/左/右布局）
@@ -77,6 +80,9 @@ IOIQ-System/
 │  │  │  ├─ watch_source_list.html  # 瞭望数据源列表页
 │  │  │  ├─ watch_source_edit.html  # 瞭望数据源新增/编辑页
 │  │  │  └─ watch_collect.html      # 瞭望采集页（独立科技风/搜索引擎式交互）
+│  │  │  └─ data_warehouse.html     # 数据仓库列表页（筛选栏/批量操作/AI入口/分页+深度采集状态）
+│  │  │  └─ deep_detail.html        # 深度采集详情页（源数据信息/AI摘要/正文/日志）
+│  │  │  └─ deep_collect_list.html   # 深度采集列表页（所有任务/统计卡片/状态/分页）
 │  │  └─ web/              # 前台用户页面（预留）
 │  │     ├─ base.html      # 基础模板（预留）
 │  │     ├─ index.html     # 首页（预留）
@@ -126,6 +132,7 @@ IOIQ-System/
   - **模型引擎**：`model_list.html`（三列橱窗卡片/科技风/Token 可视化）、`model_edit.html`（OPENAI-API 配置表单/SSE 流式开关/Think 开关）、`model_chat.html`（对话测试/SSE 流式聊天/Think 模式面板）
   - **瞭望数据源管理**：`watch_source_list.html`（表格列表+分页+搜索）、`watch_source_edit.html`（采集规则配置/请求头JSON编辑器/分页开关）
   - **瞭望采集**：`watch_collect.html`（独立深色科技风页面 / 中央搜索框 / 采集源开关面板 / 参数配置联动 / 结果橱窗3列 / 多选全选 / 一键保存）
+  - **数据仓库**：`data_warehouse.html`（采集结果列表 + 关键词/时间/来源筛选 + 全选批量删除 + AI深度采集入口(实时进度面板/SSE流式/统计) + 深度采集状态标识 + 分页20条/页）、`deep_detail.html`（源数据信息/AI分析摘要/提取正文/采集日志）
   - 前台页面（`web/`）：预留，待后续开发
 - **Controller（控制层）** — `app/controllers/`
   - `admin_auth.py`：后台认证控制器（登录/登出/主页）
@@ -133,6 +140,8 @@ IOIQ-System/
   - `model_engine.py`：模型引擎控制器（列表/新增/编辑/删除/设默认 + SSE 流式对话测试）
   - `watch_source.py`：瞭望数据源控制器（列表/新增/编辑/删除 + 占位符URL配置）
   - `watch_collect.py`：瞭望采集控制器（采集主页面 + 数据源JSON接口 + SSE 流式采集执行 + 批量保存）
+  - `data_warehouse.py`：数据仓库控制器（列表/筛选/单条删除/批量删除，每页20条）
+  - `deep_collect.py`：深度采集控制器（SSE流式采集 / 单条+批量 / 网页抓取+BeautifulSoup提取 / 默认模型AI分析 / 详情查看）
 
 ### 数据库设计
 | 表名 | 说明 | 关键字段 |
@@ -143,7 +152,8 @@ IOIQ-System/
 | `role_functions` | 角色-功能关联表 | role_id, function_id (联合唯一，实现二级联动) |
 | `model_engines` | 模型引擎表 | id, name, provider, api_base, api_key, model_name, model_type(text/multimodal/vision/vector), is_default, temperature, max_tokens, system_prompt, enable_stream, enable_think, total_tokens, status |
 | `watch_sources` | 瞭望数据源表 | id, name, url_template(含{关键词}/{pn}占位), method, headers(JSON), proxy, enable_pagination, status |
-| `watch_results` | 瞭望采集结果表 | id, source_id, source_name, keyword, title, url, snippet, raw_html, page_num, collected_at |
+| `watch_results` | 瞭望采集结果表 | id, source_id, source_name, keyword, title, url, snippet, raw_html, page_num, deep_status(0未深度/1已深度), collected_at |
+| `deep_results` | 深度采集结果表 | id, watch_result_id(FK), source_url, model_engine_id, model_name, title, full_content(完整正文), content_summary(AI摘要), status(success/fail), error_message, log_text, tokens_used, duration_ms, created_at |
 
 ### 主入口（app.py）
 - 使用 `tornado.web.Application` 创建 Web 应用实例
@@ -187,6 +197,12 @@ IOIQ-System/
 | `/admin/watch-collect/sources` | WatchCollectSourcesHandler(GET) | 数据源列表JSON |
 | `/admin/watch-collect/fetch` | WatchCollectFetchHandler(POST) | SSE 流式采集执行 |
 | `/admin/watch-collect/save` | WatchCollectSaveHandler(POST) | 保存选中结果 |
+| `/admin/data-warehouse` | DataWarehouseListHandler | 数据仓库列表（筛选/分页20条） |
+| `/admin/data-warehouse/delete` | DataWarehouseDeleteHandler(POST) | 单条删除 |
+| `/admin/data-warehouse/batch-delete` | DataWarehouseBatchDeleteHandler(POST) | 批量删除 |
+| `/admin/deep-collect` | DeepCollectListHandler | 深度采集任务列表 |
+| `/admin/deep-collect/sse` | DeepCollectSSEHandler(POST) | 深度采集SSE流式接口（单条/批量） |
+| `/admin/deep-collect/detail/(\d+)` | DeepCollectDetailHandler(GET) | 深度采集结果详情页 |
 
 ### 数据流
 ```
@@ -243,6 +259,8 @@ python test/testCase1.py
 - **模型引擎模块**：CRUD + 分页(6条/页) + 模糊搜索 + 三列橱窗卡片布局(科技风格) + OPENAI-API范式配置 + Token可视化统计 + SSE流式对话测试 + Think模式 + 默认模型管理
 - **瞭望数据源模块**：CRUD + 分页(20条/页) + 模糊搜索 + URL占位符配置({关键词}{pn}) + Request Headers JSON编辑器 + 分页采集开关 + 代理配置
 - **瞭望采集模块**：独立深色科技风页面（非ZUI布局）+ 中央搜索框 + 采集源动态开关面板 + 参数配置联动(pages/pn_step/URL预览) + SSE流式采集 + 结果3列橱窗 + 多选/全选 + 一键保存到数据库
+- **数据仓库模块**：采集结果列表 + 关键词/数据来源/时间范围筛选 + 全选批量删除 + 单条删除 + 分页(20条/页) + 深度采集状态标注（已深度/未深度）
+- **深度采集模块**：单条/批量深度采集 + SSE流式进度面板 + 实时日志 + 网页抓取(requests+BeautifulSoup) + 默认模型AI分析(OpenAI兼容API) + 统计（成功/失败/耗时/Tokens） + 详情查看页（源数据信息/AI摘要/完整正文/采集日志）
 - 默认管理员账号：**admin / 123456**
 - 默认角色：超级管理员、普通管理员、普通用户（含预置功能权限）
 - 前台页面（`web/`）预留待后续开发

@@ -26,6 +26,12 @@ from app.controllers.watch_collect import (
     WatchCollectPageHandler, WatchCollectSourcesHandler,
     WatchCollectFetchHandler, WatchCollectSaveHandler,
 )
+from app.controllers.data_warehouse import (
+    DataWarehouseListHandler, DataWarehouseDeleteHandler, DataWarehouseBatchDeleteHandler,
+)
+from app.controllers.deep_collect import (
+    DeepCollectListHandler, DeepCollectSSEHandler, DeepCollectDetailHandler,
+)
 
 # 数据库初始化 & 种子数据
 from app.models.db import init_db, seed_admin, seed_roles_and_functions, seed_model_engines, seed_watch_sources
@@ -81,6 +87,14 @@ def create_app():
             ("/admin/watch-collect/sources", WatchCollectSourcesHandler),
             ("/admin/watch-collect/fetch", WatchCollectFetchHandler),
             ("/admin/watch-collect/save", WatchCollectSaveHandler),
+            # 数据仓库路由
+            ("/admin/data-warehouse", DataWarehouseListHandler),
+            ("/admin/data-warehouse/delete", DataWarehouseDeleteHandler),
+            ("/admin/data-warehouse/batch-delete", DataWarehouseBatchDeleteHandler),
+            # 深度采集路由
+            ("/admin/deep-collect", DeepCollectListHandler),
+            ("/admin/deep-collect/sse", DeepCollectSSEHandler),
+            (r"/admin/deep-collect/detail/(\d+)", DeepCollectDetailHandler),
         ],
         # 静态文件配置
         static_path=os.path.join(PROJECT_ROOT, "app", "static"),

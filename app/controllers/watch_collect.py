@@ -5,6 +5,7 @@ import re
 import tornado.web
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
 
 from app.models.watch_source import WatchSourceRepository
 from app.models.watch_result import WatchResultRepository
@@ -119,8 +120,11 @@ class WatchCollectFetchHandler(tornado.web.RequestHandler):
                     await self.flush()
                     continue
 
+                # 从 URL 模板提取 base_url（用于补全相对路径）
+                base_url = _extract_base_url(url_tpl)
+
                 # 从 HTML 提取标题和摘要
-                items = _extract_items(html, keyword)
+                items = _extract_items(html, keyword, base_url)
                 for item in items:
                     item["source_id"] = src["id"]
                     item["source_name"] = src_name
@@ -177,7 +181,7 @@ class WatchCollectSaveHandler(tornado.web.RequestHandler):
             self.write(json.dumps({"saved": 0}))
 
 
-def _extract_items(html: str, keyword: str) -> list:
+def _extract_items(html: str, keyword: str, base_url: str = "") -> list:
     """从 HTML 中提取标题、链接、摘要"""
     items = []
     soup = BeautifulSoup(html, "lxml" if _has_parser("lxml") else "html.parser")
@@ -193,7 +197,7 @@ def _extract_items(html: str, keyword: str) -> list:
             snippet = _get_parent_text(a)
             items.append({
                 "title": title[:200],
-                "url": _resolve_url(href),
+                "url": _resolve_url(href, base_url),
                 "snippet": snippet[:500],
                 "raw_html": str(a.parent)[:500] if a.parent else ""
             })
@@ -213,7 +217,7 @@ def _extract_items(html: str, keyword: str) -> list:
             snippet = _get_parent_text(tag)
             items.append({
                 "title": title[:200],
-                "url": _resolve_url(href) if href else "",
+                "url": _resolve_url(href, base_url) if href else "",
                 "snippet": snippet[:500],
                 "raw_html": ""
             })
@@ -236,14 +240,18 @@ def _get_parent_text(element) -> str:
     return ""
 
 
-def _resolve_url(href: str) -> str:
-    """补全相对 URL"""
+def _resolve_url(href: str, base_url: str = "") -> str:
+    """补全相对 URL — 使用 urljoin 将相对路径转为绝对 URL"""
     if not href:
+        return ""
+    if href.startswith("javascript:") or href.startswith("#"):
         return ""
     if href.startswith("http"):
         return href
     if href.startswith("//"):
         return "https:" + href
+    if base_url:
+        return urljoin(base_url, href)
     return href
 
 
@@ -253,3 +261,15 @@ def _has_parser(name: str) -> bool:
         return True
     except ImportError:
         return False
+
+
+def _extract_base_url(url_template: str) -> str:
+    """从 URL 模板中提取 base URL（scheme + netloc），用于补全相对路径。
+    例如: 'https://www.baidu.com/s?wd={关键词}&pn={pn}' -> 'https://www.baidu.com'
+    """
+    if not url_template:
+        return ""
+    parsed = urlparse(url_template)
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return ""

@@ -129,7 +129,30 @@ def init_db():
 						snippet TEXT DEFAULT '',
 						raw_html TEXT DEFAULT '',
 						page_num INTEGER DEFAULT 0,
+						deep_status INTEGER DEFAULT 0,
 						collected_at TEXT NOT NULL DEFAULT (datetime('now'))
+					)
+			"""
+			)
+		# 深度采集结果表
+		conn.execute(
+			"""
+				CREATE TABLE IF NOT EXISTS deep_results(
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						watch_result_id INTEGER NOT NULL,
+						source_url TEXT DEFAULT '',
+						model_engine_id INTEGER DEFAULT 0,
+						model_name TEXT DEFAULT '',
+						title TEXT DEFAULT '',
+						full_content TEXT DEFAULT '',
+						content_summary TEXT DEFAULT '',
+						status TEXT NOT NULL DEFAULT 'pending',
+						error_message TEXT DEFAULT '',
+						log_text TEXT DEFAULT '',
+						tokens_used INTEGER DEFAULT 0,
+						duration_ms INTEGER DEFAULT 0,
+						created_at TEXT NOT NULL DEFAULT (datetime('now')),
+						FOREIGN KEY(watch_result_id) REFERENCES watch_results(id) ON DELETE CASCADE
 					)
 			"""
 			)

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}深度采集详情{% end %}
+
+{% block head %}
+<style>
+    .detail-card {
+        background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        margin-bottom: 16px; overflow: hidden;
+    }
+    .card-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 20px; border-bottom: 1px solid #e5e7eb;
+    }
+    .card-header h4 { font-size: 14px; font-weight: 700; color: #1e293b; margin: 0; }
+    .card-body { padding: 16px 20px; }
+    .info-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+        font-size: 13px;
+    }
+    .info-item { display: flex; align-items: flex-start; gap: 8px; }
+    .info-label { color: #94a3b8; white-space: nowrap; font-weight: 600; min-width: 70px; }
+    .info-value { color: #334155; word-break: break-all; }
+    .status-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 700;
+    }
+    .status-badge.success { background: #d1fae5; color: #065f46; }
+    .status-badge.fail { background: #fee2e2; color: #991b1b; }
+    .content-box {
+        background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px;
+        padding: 16px; font-size: 13px; line-height: 1.8; color: #334155;
+        white-space: pre-wrap; word-break: break-word; max-height: 500px; overflow-y: auto;
+    }
+    .summary-box {
+        background: linear-gradient(135deg, #ede9fe, #f5f3ff);
+        border: 1px solid #ddd6fe; border-radius: 8px;
+        padding: 16px; font-size: 14px; line-height: 1.7; color: #4c1d95;
+        white-space: pre-wrap; word-break: break-word;
+    }
+    .log-box {
+        background: #1e293b; border-radius: 8px; padding: 14px 16px;
+        font-size: 12px; font-family: 'Consolas', 'Courier New', monospace;
+        color: #e2e8f0; line-height: 1.8; white-space: pre-wrap;
+        max-height: 300px; overflow-y: auto;
+    }
+    .meta-tag {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;
+        background: #f1f5f9; color: #64748b; margin-right: 6px; margin-bottom: 4px;
+    }
+    .btn-back {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 16px; border-radius: 8px; border: 1px solid #e2e8f0;
+        background: #fff; color: #475569; font-size: 13px; font-weight: 600;
+        text-decoration: none; transition: all 0.15s;
+    }
+    .btn-back:hover { background: #f1f5f9; }
+    .no-deep {
+        text-align: center; padding: 48px 16px; color: #94a3b8;
+    }
+    .no-deep i { font-size: 42px; display: block; margin-bottom: 12px; opacity: 0.25; }
+</style>
+{% end %}
+
+{% block content %}
+<div class="page-header">
+    <div style="display:flex; align-items:center; gap:12px;">
+        <a href="/admin/data-warehouse" class="btn-back"><i class="fas fa-arrow-left"></i> 返回数据仓库</a>
+        <h2 style="margin:0;"><i class="fas fa-file-alt me-2" style="color:#7c3aed;"></i>深度采集详情</h2>
+    </div>
+    <p style="margin-top:6px;">查看深度采集的详细分析结果</p>
+</div>
+
+{% if deep %}
+<!-- 源数据信息 -->
+<div class="detail-card">
+    <div class="card-header">
+        <h4><i class="fas fa-link me-2" style="color:#7c3aed;"></i>源数据信息</h4>
+        <span class="status-badge {{ deep['status'] if deep['status'] == 'success' else 'fail' }}">
+            <i class="fas fa-{{ 'check-circle' if deep['status'] == 'success' else 'times-circle' }}"></i>
+            {{ '采集成功' if deep['status'] == 'success' else '采集失败' }}
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="info-grid">
+            <div class="info-item"><span class="info-label">源ID：</span><span class="info-value">#{{ item["id"] }}</span></div>
+            <div class="info-item"><span class="info-label">标题：</span><span class="info-value">{{ item["title"] or "-" }}</span></div>
+            <div class="info-item"><span class="info-label">关键词：</span><span class="info-value"><span class="meta-tag">{{ item["keyword"] or "-" }}</span></span></div>
+            <div class="info-item"><span class="info-label">数据来源：</span><span class="info-value">{{ item["source_name"] or "-" }}</span></div>
+            <div class="info-item"><span class="info-label">采集时间：</span><span class="info-value">{{ item["collected_at"] }}</span></div>
+            <div class="info-item"><span class="info-label">原文链接：</span><span class="info-value">
+                {% if item["url"] and item["url"].startswith("http") %}
+                <a href="{{ item['url'] }}" target="_blank" style="color:#4a6cf7;">{{ item["url"][:80] }}{% if len(item["url"]) > 80 %}...{% end %}</a>
+                {% else %}
+                {{ item["url"] or "无" }}
+                {% end %}
+            </span></div>
+        </div>
+    </div>
+</div>
+
+<!-- AI 分析结果 -->
+<div class="detail-card">
+    <div class="card-header">
+        <h4><i class="fas fa-brain me-2" style="color:#8b5cf6;"></i>AI 分析摘要</h4>
+        <div>
+            {% if deep["model_name"] %}<span class="meta-tag"><i class="fas fa-microchip"></i> {{ deep["model_name"] }}</span>{% end %}
+            {% if deep["tokens_used"] %}<span class="meta-tag"><i class="fas fa-coins"></i> {{ deep["tokens_used"] }} tokens</span>{% end %}
+            {% if deep["duration_ms"] %}<span class="meta-tag"><i class="fas fa-clock"></i> {{ deep["duration_ms"] }}ms</span>{% end %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if deep["content_summary"] %}
+        <div class="summary-box">{{ deep["content_summary"] }}</div>
+        {% else %}
+        <p style="color:#94a3b8;text-align:center;">暂无AI分析摘要</p>
+        {% end %}
+    </div>
+</div>
+
+<!-- 完整正文 -->
+<div class="detail-card">
+    <div class="card-header">
+        <h4><i class="fas fa-align-left me-2" style="color:#64748b;"></i>提取正文</h4>
+        <span class="meta-tag">{{ len(deep["full_content"] or "") }} 字符</span>
+    </div>
+    <div class="card-body">
+        {% if deep["full_content"] %}
+        <div class="content-box">{{ deep["full_content"] }}</div>
+        {% else %}
+        <p style="color:#94a3b8;text-align:center;">无正文内容{% if deep["error_message"] %}（{{ deep["error_message"] }}）{% end %}</p>
+        {% end %}
+    </div>
+</div>
+
+<!-- 采集日志 -->
+{% if deep["log_text"] %}
+<div class="detail-card">
+    <div class="card-header">
+        <h4><i class="fas fa-terminal me-2" style="color:#334155;"></i>采集日志</h4>
+    </div>
+    <div class="card-body">
+        <div class="log-box">{{ deep["log_text"] }}</div>
+    </div>
+</div>
+{% end %}
+
+{% if deep["error_message"] %}
+<div class="detail-card" style="border-left:4px solid #ef4444;">
+    <div class="card-header">
+        <h4 style="color:#ef4444;"><i class="fas fa-exclamation-triangle me-2"></i>错误信息</h4>
+    </div>
+    <div class="card-body">
+        <p style="color:#991b1b;font-size:13px;">{{ deep["error_message"] }}</p>
+    </div>
+</div>
+{% end %}
+
+{% else %}
+<!-- 未深度采集 -->
+<div class="detail-card">
+    <div class="card-body">
+        <div class="no-deep">
+            <i class="fas fa-robot"></i>
+            <p style="font-size:15px;font-weight:600;color:#475569;">该记录尚未进行深度采集</p>
+            <p style="font-size:13px;">请返回数据仓库列表，点击 AI 按钮发起深度采集</p>
+            <a href="/admin/data-warehouse" class="btn-back" style="margin-top:12px;">
+                <i class="fas fa-arrow-left"></i> 返回数据仓库
+            </a>
+        </div>
+    </div>
+</div>
+{% end %}
+
+{% end %}
