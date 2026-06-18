@@ -57,6 +57,15 @@ from app.controllers.chat_manage import (
     ChatReviewHandler, ChatScanHandler, ChatContextHandler,
     ChatExportHandler, ChatStatsHandler,
 )
+from app.controllers.dashboard_screen import (
+    DashboardScreenHandler, DashboardDataHandler,
+)
+from app.controllers.system_settings import (
+    SystemSettingsHandler, SystemSettingsSaveHandler,
+    SystemBackupHandler, SystemRestoreHandler,
+    SystemStatusHandler, SystemStatusJsonHandler,
+    OperationLogHandler, OperationLogClearHandler, OperationLogExportHandler,
+)
 
 # 数据库初始化 & 种子数据
 from app.models.db import init_db, seed_admin, seed_roles_and_functions, seed_model_engines, seed_watch_sources
@@ -178,6 +187,19 @@ def create_app():
             ("/admin/chat/scan", ChatScanHandler),
             ("/admin/chat/export", ChatExportHandler),
             ("/admin/chat-stats", ChatStatsHandler),
+            # 数智大屏路由
+            ("/admin/dashboard", DashboardScreenHandler),
+            ("/admin/dashboard/data", DashboardDataHandler),
+            # 系统设置路由
+            ("/admin/system", SystemSettingsHandler),
+            ("/admin/system/save", SystemSettingsSaveHandler),
+            ("/admin/system/backup", SystemBackupHandler),
+            ("/admin/system/restore", SystemRestoreHandler),
+            ("/admin/system-status", SystemStatusHandler),
+            ("/admin/system-status/json", SystemStatusJsonHandler),
+            ("/admin/operation-logs", OperationLogHandler),
+            ("/admin/operation-logs/clear", OperationLogClearHandler),
+            ("/admin/operation-logs/export", OperationLogExportHandler),
         ],
         # 静态文件配置
         static_path=os.path.join(PROJECT_ROOT, "app", "static"),

@@ -131,6 +131,8 @@ IOIQ-System/
   - `ai_skill.py`：`AiSkillRepository` + `SkillCallLogRepository` 技能 CRUD + 调用日志 + 统计 + 内存缓存热更新
   - `session_manage.py`：`SessionRepository` 会话CRUD + 分页/筛选/统计 + 标记/归档/导出/批量删除
   - `chat_manage.py`：`ChatManageRepository` 消息CRUD + 分页/筛选/统计 + 审核标记 + 敏感词扫描 + 导出
+  - `dashboard_screen.py`：`DashboardRepository` 全模块聚合查询
+  - `system_settings.py`：`SystemSettingsRepository` 设置CRUD + 备份恢复 + 运行状态 + `OperationLogRepository` 日志分页/筛选/清空
 - **View（视图层）** — `app/templates/`
   - 后台页面（`admin/`）：登录页、基础布局模板（ZUI 上/左/右布局，左侧菜单15项扁平无分组）、控制台首页
   - **功能管理**：`func_list.html`（列表+分页+搜索）、`func_edit.html`（新增/编辑表单）
@@ -146,6 +148,8 @@ IOIQ-System/
   - **技能管理**：`skill_list.html`（卡片网格/12个每页/分类筛选/关键词标签/状态切换）、`skill_edit.html`（名称/分类/图标/Prompt模板/模型绑定/版本）、`skill_stats.html`（调用统计/按技能筛选/日志列表）、`skill_market.html`（技能市场预留/可用技能橱窗/导入预告）
   - **会话管理**：`session_list.html`（表格列表/5项统计卡片/关键词/用户/状态/日期筛选/归档/批量删除/分页）、`session_detail.html`（会话详情/标题与标记编辑/完整对话历史/归档/导出JSON+文本）、`session_stats.html`（5项全局统计/数据说明）
   - **对话管理**：`chat_list.html`（消息表格/5项统计卡片/关键词/用户/角色/审核状态/日期筛选/标记/批量删除+标记/敏感词扫描/分页）、`chat_context.html`（消息上下文/完整对话链路/高亮当前消息）、`chat_stats.html`（5项统计指标/敏感词扫描结果/词库展示）
+  - **数智大屏**：`dashboard_screen.html`（独立暗色科技风/Chart.js图表/全屏模式/3套模板切换/拖拽布局/30s自动刷新/核心指标卡片/消息趋势折线图/角色饼图/模型柱状图/24小时热力/实时对话流/风险预警/技能排行/系统资源）
+  - **系统设置**：`system_settings.html`（4个配置分区：基本信息/运行参数/SMTP邮件/通知渠道 + 备份按钮）、`system_status.html`（6项运行状态卡片/备份列表/恢复/30s自动刷新）、`operation_logs.html`（操作日志表格/操作人+类型+日期筛选/分页/JSON导出/清空）
   - 前台页面（`web/`）：
     - `base.html` — 前台基础布局模板
     - `login.html` — 前台用户登录页（深色科技风/品牌展示区/角色区分）
@@ -171,8 +175,8 @@ IOIQ-System/
 | 12 | 技能管理 | `/admin/skills` | `skills` | fa-tools |
 | 13 | 会话管理 | `/admin/sessions` | `sessions` | fa-history |
 | 14 | 对话管理 | `/admin/chats` | `chats` | fa-comments |
-| 15 | 数智大屏 | `#` | `dashboard_screen` | fa-chart-bar |
-| 16 | 系统设置 | `#` | `settings` | fa-cog |
+| 15 | 数智大屏 | `/admin/dashboard` | `dashboard_screen` | fa-chart-bar |
+| 16 | 系统设置 | `/admin/system` | `system` | fa-cog |
 
 - **Controller（控制层）** — `app/controllers/`
   - `admin_auth.py`：后台认证控制器（登录/登出/主页）
@@ -189,6 +193,8 @@ IOIQ-System/
   - `skill_manage.py`：技能管理控制器（CRUD + 状态切换 + 热更新刷新 + 调用统计 + 技能市场预留）
   - `session_manage.py`：会话管理控制器（列表/详情/标题编辑/标记编辑/归档/删除/批量删除/JSON+文本导出/统计）
   - `chat_manage.py`：对话管理控制器（消息列表/上下文/删除/批量删除/审核标记/敏感词扫描/JSON导出/统计）
+  - `dashboard_screen.py`：数智大屏控制器（主页 + 实时数据 JSON API）
+  - `system_settings.py`：系统设置控制器（设置保存/备份恢复/运行状态/操作日志）
 
 ### 数据库设计
 | 表名 | 说明 | 关键字段 |
@@ -203,6 +209,8 @@ IOIQ-System/
 | `deep_results` | 深度采集结果表 | id, watch_result_id(FK), source_url, model_engine_id, model_name, title, full_content(完整正文), content_summary(AI摘要), status(success/fail), error_message, log_text, tokens_used, duration_ms, created_at |
 | `conversations` | 对话会话表 | id, user_id(FK), title, model_engine_id, model_name, status(active/archived), tags, created_at, updated_at |
 | `chat_messages` | 对话消息表 | id, conversation_id(FK), role(user/assistant), content, tokens_used, review_status(normal/flagged/blocked), created_at |
+| `system_settings` | 系统设置表 | id, key(UNIQUE), value, category(general/mail/notify), label, updated_at |
+| `operation_logs` | 操作日志表 | id, operator, action, detail, ip, created_at |
 | `api_interfaces` | 接口管理表 | id, name, path, method(GET/POST/PUT/DELETE/PATCH), description, params(JSON), headers(JSON), auth_type, status, created_at, updated_at |
 | `api_call_logs` | 接口调用日志表 | id, interface_id, interface_name, method, path, request_params, request_headers, response_status, response_body, response_time_ms, success, error_message, created_at |
 | `digital_employees` | 数字员工表 | id, name, avatar, role_name, greeting, skills(JSON), model_engine_id, model_name, system_prompt, status(enabled/disabled/maintenance), version, total_calls, total_tokens, total_duration_ms, created_at, updated_at |
@@ -309,6 +317,17 @@ IOIQ-System/
 | `/admin/chat/scan` | ChatScanHandler(POST) | 敏感词扫描 & 标记 |
 | `/admin/chat/export` | ChatExportHandler(GET) | 导出全部消息 JSON |
 | `/admin/chat-stats` | ChatStatsHandler(GET) | 对话消息统计 |
+| `/admin/dashboard` | DashboardScreenHandler(GET) | 数智大屏主页 |
+| `/admin/dashboard/data` | DashboardDataHandler(GET) | 大屏实时数据 API |
+| `/admin/system` | SystemSettingsHandler(GET) | 系统设置主页 |
+| `/admin/system/save` | SystemSettingsSaveHandler(POST) | 保存系统设置 |
+| `/admin/system/backup` | SystemBackupHandler(POST) | 创建数据库备份 |
+| `/admin/system/restore` | SystemRestoreHandler(POST) | 恢复数据库备份 |
+| `/admin/system-status` | SystemStatusHandler(GET) | 系统运行状态 |
+| `/admin/system-status/json` | SystemStatusJsonHandler(GET) | 运行状态 API |
+| `/admin/operation-logs` | OperationLogHandler(GET) | 操作日志列表 |
+| `/admin/operation-logs/clear` | OperationLogClearHandler(POST) | 清空日志 |
+| `/admin/operation-logs/export` | OperationLogExportHandler(GET) | 导出日志 JSON |
 | `/admin/web/reports` | WebReportHandler(GET) | 业务报表页 |
 
 ### 数据流

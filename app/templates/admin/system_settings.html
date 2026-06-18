@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}系统设置{% end %}
+{% block head %}
+<style>
+    .section { background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; padding: 24px; margin-bottom: 18px; }
+    .section-title { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+    .section-title i { color: #4a6cf7; font-size: 18px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-group { display: flex; flex-direction: column; }
+    .form-group.full { grid-column: span 2; }
+    @media (max-width: 768px) { .form-group.full { grid-column: span 1; } }
+    .form-group label { font-size: 13px; font-weight: 500; color: #475569; margin-bottom: 5px; }
+    .form-group input, .form-group select, .form-group textarea {
+        padding: 9px 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 13px; color: #334155;
+        transition: border-color 0.15s;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+        outline: none; border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,0.1);
+    }
+    .form-group textarea { min-height: 60px; resize: vertical; }
+    .form-group .help { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+    .btn { padding: 8px 18px; border-radius: 8px; font-size: 13px; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: #4a6cf7; color: #fff; }
+    .btn-primary:hover { background: #3b5de7; }
+    .btn-outline { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+    .btn-outline:hover { background: #f1f5f9; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-warning { background: #f59e0b; color: #fff; }
+    .toast { position: fixed; top: 16px; right: 16px; background: #16a34a; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; }
+    .toast.show { opacity: 1; }
+    .toast.error { background: #ef4444; }
+    .tab-bar { display: flex; gap: 0; margin-bottom: 18px; border-bottom: 2px solid #e5e7eb; }
+    .tab-bar a { padding: 9px 20px; font-size: 13px; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+    .tab-bar a.active { color: #4a6cf7; border-bottom-color: #4a6cf7; font-weight: 600; }
+    .tab-bar a:hover { color: #4a6cf7; }
+</style>
+{% end %}
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-cog me-2" style="color:#4a6cf7;"></i>系统设置</h2>
+    <p>配置系统基本信息、运行参数、邮件服务、通知渠道与备份恢复</p>
+</div>
+
+<div class="tab-bar">
+    <a href="/admin/system" class="active">基本设置</a>
+    <a href="/admin/system-status">运行状态</a>
+    <a href="/admin/operation-logs">操作日志</a>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<form method="post" action="/admin/system/save" id="settingsForm">
+    <!-- 系统基本信息 -->
+    <div class="section">
+        <div class="section-title"><i class="fas fa-info-circle"></i>系统基本信息</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>系统名称</label>
+                <input name="site_name" value="{{ settings.get('site_name', '') }}">
+            </div>
+            <div class="form-group">
+                <label>系统版本</label>
+                <input value="{{ settings.get('version', '2.1.0') }}" disabled style="background:#f8fafc;">
+                <input type="hidden" name="version" value="{{ settings.get('version', '2.1.0') }}">
+            </div>
+            <div class="form-group full">
+                <label>LOGO URL</label>
+                <input name="site_logo" value="{{ settings.get('site_logo', '') }}" placeholder="/static/img/logo.png">
+                <span class="help">留空使用默认 LOGO</span>
+            </div>
+            <div class="form-group">
+                <label>版权信息</label>
+                <input name="site_copyright" value="{{ settings.get('site_copyright', '') }}">
+            </div>
+            <div class="form-group">
+                <label>默认语言</label>
+                <select name="default_lang">
+                    <option value="zh-CN" {% if settings.get('default_lang') == 'zh-CN' %}selected{% end %}>简体中文</option>
+                    <option value="en-US" {% if settings.get('default_lang') == 'en-US' %}selected{% end %}>English</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- 运行参数 -->
+    <div class="section">
+        <div class="section-title"><i class="fas fa-sliders-h"></i>运行参数</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>会话超时时间 (分钟)</label>
+                <input name="session_timeout" type="number" min="5" max="1440" value="{{ settings.get('session_timeout', '120') }}">
+                <span class="help">用户无操作后自动退出时间</span>
+            </div>
+            <div class="form-group">
+                <label>文件上传大小限制 (MB)</label>
+                <input name="upload_max_size" type="number" min="1" max="500" value="{{ settings.get('upload_max_size', '10') }}">
+            </div>
+            <div class="form-group">
+                <label>验证码开关</label>
+                <select name="captcha_enabled">
+                    <option value="1" {% if settings.get('captcha_enabled') == '1' %}selected{% end %}>启用</option>
+                    <option value="0" {% if settings.get('captcha_enabled') == '0' %}selected{% end %}>关闭</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>维护模式</label>
+                <select name="maintenance_mode">
+                    <option value="0" {% if settings.get('maintenance_mode') == '0' %}selected{% end %}>正常运行</option>
+                    <option value="1" {% if settings.get('maintenance_mode') == '1' %}selected{% end %}>维护中</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- 邮件服务 -->
+    <div class="section">
+        <div class="section-title"><i class="fas fa-envelope"></i>邮件服务 (SMTP)</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>SMTP 服务器</label>
+                <input name="smtp_host" value="{{ settings.get('smtp_host', '') }}" placeholder="smtp.example.com">
+            </div>
+            <div class="form-group">
+                <label>SMTP 端口</label>
+                <input name="smtp_port" value="{{ settings.get('smtp_port', '587') }}" placeholder="587">
+            </div>
+            <div class="form-group">
+                <label>邮箱账号</label>
+                <input name="smtp_user" value="{{ settings.get('smtp_user', '') }}" placeholder="notify@example.com">
+            </div>
+            <div class="form-group">
+                <label>邮箱密码 / 授权码</label>
+                <input name="smtp_pass" type="password" value="{{ settings.get('smtp_pass', '') }}" placeholder="****">
+            </div>
+            <div class="form-group full">
+                <label>发件人</label>
+                <input name="smtp_from" value="{{ settings.get('smtp_from', '') }}" placeholder="IOIQ System <notify@example.com>">
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知渠道 -->
+    <div class="section">
+        <div class="section-title"><i class="fas fa-bell"></i>通知渠道</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>邮件通知</label>
+                <select name="mail_notify">
+                    <option value="1" {% if settings.get('mail_notify') == '1' %}selected{% end %}>启用</option>
+                    <option value="0" {% if settings.get('mail_notify') == '0' %}selected{% end %}>关闭</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>短信通知</label>
+                <select name="sms_notify">
+                    <option value="1" {% if settings.get('sms_notify') == '1' %}selected{% end %}>启用</option>
+                    <option value="0" {% if settings.get('sms_notify') == '0' %}selected{% end %}>关闭</option>
+                </select>
+            </div>
+            <div class="form-group full">
+                <label>Webhook 回调地址</label>
+                <input name="webhook_url" value="{{ settings.get('webhook_url', '') }}" placeholder="https://hooks.example.com/callback">
+                <span class="help">系统事件将通过此地址推送 JSON 通知</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i>保存设置</button>
+    </div>
+</form>
+
+<!-- 备份恢复 -->
+<div class="section" style="margin-top:18px;">
+    <div class="section-title"><i class="fas fa-database"></i>备份与恢复</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <form method="post" action="/admin/system/backup" style="display:inline;">
+            <button type="submit" class="btn btn-warning"><i class="fas fa-cloud-upload-alt"></i>立即备份数据库</button>
+        </form>
+        <a href="/admin/system-status" class="btn btn-outline"><i class="fas fa-file-archive"></i>查看备份列表</a>
+    </div>
+</div>
+
+{% if msg %}
+<script>
+(function(){
+    var t=document.getElementById('toast');
+    var m='{{ msg }}';
+    if(m==='saved'){ t.textContent='保存成功'; t.className='toast'; }
+    else if(m==='backup_ok'){ t.textContent='备份成功'; t.className='toast'; }
+    else if(m.startsWith('backup_fail')){ t.textContent='备份失败: '+m.split(':')[1]; t.className='toast error'; }
+    else if(m.startsWith('restore_fail')){ t.textContent='恢复失败: '+m.split(':')[1]; t.className='toast error'; }
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); },3000);
+})();
+</script>
+{% end %}
+{% end %}

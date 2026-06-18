@@ -14,6 +14,9 @@ def get_connection():
 	conn.row_factory=sqlite3.Row
 	return conn
 
+def get_path():
+	return DB_PATH
+
 def _hash_password(password: str, salt: bytes) -> str:
     dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100_000)
     return dk.hex()
@@ -206,6 +209,32 @@ def init_db():
 				conn.execute(f"ALTER TABLE chat_messages ADD COLUMN {col_def[0]} {col_def[1]}")
 			except Exception:
 				pass
+		# 系统设置表
+		conn.execute(
+			"""
+				CREATE TABLE IF NOT EXISTS system_settings(
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						key TEXT NOT NULL UNIQUE,
+						value TEXT DEFAULT '',
+						category TEXT DEFAULT 'general',
+						label TEXT DEFAULT '',
+						updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+					)
+			"""
+			)
+		# 操作日志表
+		conn.execute(
+			"""
+				CREATE TABLE IF NOT EXISTS operation_logs(
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						operator TEXT DEFAULT '',
+						action TEXT NOT NULL,
+						detail TEXT DEFAULT '',
+						ip TEXT DEFAULT '',
+						created_at TEXT NOT NULL DEFAULT (datetime('now'))
+					)
+			"""
+			)
 		# 接口管理表
 		conn.execute(
 			"""

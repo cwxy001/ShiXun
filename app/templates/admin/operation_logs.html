@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}操作日志 - 系统设置{% end %}
+{% block head %}
+<style>
+    .section { background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; padding: 24px; margin-bottom: 18px; }
+    .section-title { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+    .section-title .left { display: flex; align-items: center; gap: 10px; }
+    .section-title i { color: #4a6cf7; font-size: 18px; }
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .filter-bar input, .filter-bar select { padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 13px; }
+    .filter-bar input[type="text"] { width: 180px; }
+    .filter-bar input[type="date"] { width: 135px; }
+    .table-card { background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; }
+    .table-card table { width: 100%; border-collapse: collapse; }
+    .table-card th { background: #f8fafc; padding: 10px 12px; font-size: 12px; color: #64748b; font-weight: 600; text-align: left; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+    .table-card td { padding: 9px 12px; font-size: 13px; color: #334155; border-bottom: 1px solid #f1f5f9; }
+    .table-card tr:hover td { background: #fafbfd; }
+    .badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; display: inline-block; }
+    .badge-update { background: #eef2ff; color: #4a6cf7; }
+    .badge-backup { background: #fff7ed; color: #d97706; }
+    .badge-restore { background: #fef2f2; color: #ef4444; }
+    .badge-delete { background: #fee2e2; color: #dc2626; }
+    .badge-login { background: #f0fdf4; color: #16a34a; }
+    .badge-create { background: #eff6ff; color: #3b82f6; }
+    .badge-other { background: #f8fafc; color: #64748b; }
+    .btn { padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px solid #e2e8f0; background: #fff; color: #475569; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s; white-space: nowrap; }
+    .btn:hover { background: #f1f5f9; }
+    .btn-primary { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
+    .btn-primary:hover { background: #3b5de7; }
+    .btn-danger { color: #ef4444; border-color: #fecaca; }
+    .btn-danger:hover { background: #fef2f2; }
+    .tab-bar { display: flex; gap: 0; margin-bottom: 18px; border-bottom: 2px solid #e5e7eb; }
+    .tab-bar a { padding: 9px 20px; font-size: 13px; color: #64748b; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+    .tab-bar a.active { color: #4a6cf7; border-bottom-color: #4a6cf7; font-weight: 600; }
+    .tab-bar a:hover { color: #4a6cf7; }
+</style>
+{% end %}
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-history me-2" style="color:#4a6cf7;"></i>操作日志</h2>
+    <p>记录所有关键操作，支持按操作人、操作类型、时间范围检索</p>
+</div>
+
+<div class="tab-bar">
+    <a href="/admin/system">基本设置</a>
+    <a href="/admin/system-status">运行状态</a>
+    <a href="/admin/operation-logs" class="active">操作日志</a>
+</div>
+
+<div class="filter-bar">
+    <input type="text" id="operatorInput" placeholder="操作人..." value="{{ operator }}" onkeydown="if(event.key==='Enter')search()">
+    <select id="actionFilter" onchange="search()">
+        <option value="" {% if not action %}selected{% end %}>全部类型</option>
+        {% for a in actions %}
+        <option value="{{ a }}" {% if action == a %}selected{% end %}>{{ a }}</option>
+        {% end %}
+    </select>
+    <input type="date" id="dateFrom" value="{{ date_from }}" onchange="search()">
+    <input type="date" id="dateTo" value="{{ date_to }}" onchange="search()">
+    <button onclick="search()" class="btn btn-primary"><i class="fas fa-search me-1"></i>搜索</button>
+    <a href="/admin/operation-logs" class="btn"><i class="fas fa-redo me-1"></i>重置</a>
+    <a href="/admin/operation-logs/export" class="btn"><i class="fas fa-download me-1"></i>导出 JSON</a>
+    <form method="post" action="/admin/operation-logs/clear" style="display:inline;" onsubmit="return confirm('确定清空所有操作日志吗？此操作不可恢复！')">
+        <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-1"></i>清空日志</button>
+    </form>
+</div>
+
+<div class="table-card">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>操作人</th>
+                <th>操作类型</th>
+                <th>详情</th>
+                <th>IP</th>
+                <th>操作时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in list %}
+            <tr>
+                <td style="font-size:12px;color:#94a3b8;">#{{ r['id'] }}</td>
+                <td style="font-weight:500;">{{ r['operator'] or '-' }}</td>
+                <td>
+                    <span class="badge badge-{% if 'update_settings' in str(r['action']) %}update{% elif 'backup' in str(r['action']) %}backup{% elif 'restore' in str(r['action']) %}restore{% elif 'delete' in str(r['action']) or 'clear' in str(r['action']) %}delete{% elif 'login' in str(r['action']) %}login{% elif 'create' in str(r['action']) or 'add' in str(r['action']) or 'register' in str(r['action']) %}create{% else %}other{% end %}">
+                        {{ r['action'] }}
+                    </span>
+                </td>
+                <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r['detail'] or '-' }}</td>
+                <td style="font-size:12px;color:#94a3b8;">{{ r['ip'] or '-' }}</td>
+                <td style="font-size:12px;color:#94a3b8;white-space:nowrap;">{{ r['created_at'] }}</td>
+            </tr>
+            {% end %}
+            {% if not list %}
+            <tr><td colspan="6" style="text-align:center;padding:48px;color:#94a3b8;">
+                <i class="fas fa-clipboard-list" style="font-size:40px;display:block;margin-bottom:12px;"></i>
+                暂无操作日志
+            </td></tr>
+            {% end %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+<div style="text-align:center;margin-top:20px;">
+    {% set sp = page - 2 %}
+    {% if sp < 1 %}{% set sp = 1 %}{% end %}
+    {% set ep = sp + 4 %}
+    {% if ep > total_pages %}{% set ep = total_pages %}{% set sp = ep - 4 %}{% end %}
+    {% if sp < 1 %}{% set sp = 1 %}{% end %}
+    {% set base_params = '' %}
+    {% if operator %}{% set base_params = base_params + '&operator=' + operator %}{% end %}
+    {% if action %}{% set base_params = base_params + '&action=' + action %}{% end %}
+    {% if date_from %}{% set base_params = base_params + '&date_from=' + date_from %}{% end %}
+    {% if date_to %}{% set base_params = base_params + '&date_to=' + date_to %}{% end %}
+    {% if sp > 1 %}
+        <a href="?page=1{{ base_params }}" class="btn">&laquo;</a>
+        <a href="?page={{ page - 1 }}{{ base_params }}" class="btn">&lsaquo;</a>
+    {% end %}
+    {% for p in range(sp, ep + 1) %}
+        <a href="?page={{ p }}{{ base_params }}" class="btn {% if p == page %}btn-primary{% end %}">{{ p }}</a>
+    {% end %}
+    {% if ep < total_pages %}
+        <a href="?page={{ page + 1 }}{{ base_params }}" class="btn">&rsaquo;</a>
+        <a href="?page={{ total_pages }}{{ base_params }}" class="btn">&raquo;</a>
+    {% end %}
+</div>
+{% end %}
+
+<script>
+function search() {
+    const p = [];
+    const op = document.getElementById('operatorInput').value.trim();
+    const ac = document.getElementById('actionFilter').value;
+    const df = document.getElementById('dateFrom').value;
+    const dt = document.getElementById('dateTo').value;
+    if (op) p.push('operator=' + encodeURIComponent(op));
+    if (ac) p.push('action=' + ac);
+    if (df) p.push('date_from=' + df);
+    if (dt) p.push('date_to=' + dt);
+    location.href = '/admin/operation-logs' + (p.length ? '?' + p.join('&') : '');
+}
+</script>
+{% end %}
