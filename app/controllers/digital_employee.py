@@ -43,6 +43,59 @@ def _get_skill_name_map():
     return {s["id"]: s["name"] for s in skills}
 
 
+def build_employee_system_prompt(employee: dict) -> str:
+    """共享函数 — 构建数字员工的完整 system prompt（管理端+用户端统一使用）
+
+    返回格式：
+      你是{name}，{role_name}。
+      角色设定：{system_prompt 或 greeting}
+
+      📋 你拥有以下技能能力：
+      - 技能名：描述
+      ...
+
+      📝 各技能详细行为定义：
+      【技能名】prompt_template
+      ...
+
+      当用户询问"你有什么能力"...时，请列出...
+      当用户的问题匹配某个技能时...
+    """
+    role_desc = (employee.get("role_name") or "").strip()
+    identity = f"你是{employee['name']}"
+    if role_desc:
+        identity += f"，{role_desc}"
+    identity += "。\n"
+
+    # 角色设定：优先 system_prompt，否则用 greeting
+    custom = (employee.get("system_prompt") or "").strip()
+    if not custom:
+        custom = (employee.get("greeting") or "").strip()
+    if custom:
+        identity += f"角色设定：{custom}\n"
+
+    system_prompt = identity
+
+    # 注入绑定的技能
+    skill_ids = _resolve_skill_ids(employee.get("skills") or "")
+    if skill_ids:
+        skill_prompts = []
+        skill_summary_list = []
+        for sid in skill_ids:
+            skill = AiSkillRepository.get_by_id(sid)
+            if skill and skill["prompt_template"]:
+                skill_prompts.append(f"【{skill['name']}】{skill['prompt_template']}")
+                desc = (skill["description"] or "").strip()
+                skill_summary_list.append(f"- {skill['name']}" + (f"：{desc}" if desc else ""))
+        if skill_prompts:
+            system_prompt += "\n📋 你拥有以下技能能力：\n" + "\n".join(skill_summary_list)
+            system_prompt += "\n\n📝 各技能详细行为定义：\n" + "\n".join(skill_prompts)
+            system_prompt += "\n\n当用户询问\"你有什么能力\"、\"你会什么\"、\"你的技能\"等问题时，请列出上述技能名称及其简要说明。"
+            system_prompt += "\n当用户的问题匹配某个技能时，请使用该技能定义的角色和能力来回答。"
+
+    return system_prompt
+
+
 class EmployeeListHandler(tornado.web.RequestHandler):
     """数字员工列表页"""
 
@@ -271,24 +324,8 @@ class EmployeeChatSSEHandler(tornado.web.RequestHandler):
         api_base = (model["api_base"] or "https://api.openai.com/v1") if model else "https://api.openai.com/v1"
         model_name = (model["model_name"] or "gpt-3.5-turbo") if model else "gpt-3.5-turbo"
 
-        system_prompt = employee["system_prompt"] or f"你是 {employee['name']}，{employee['role_name']}。{employee['greeting']}"
-
-        # 注入绑定的技能 prompt
-        skill_ids = _resolve_skill_ids(employee["skills"] or "")
-        if skill_ids:
-            skill_prompts = []
-            skill_summary_list = []  # 简洁能力列表，供模型自我描述
-            for sid in skill_ids:
-                skill = AiSkillRepository.get_by_id(sid)
-                if skill and skill["prompt_template"]:
-                    skill_prompts.append(f"【{skill['name']}】{skill['prompt_template']}")
-                    desc = (skill["description"] or "").strip()
-                    skill_summary_list.append(f"- {skill['name']}" + (f"：{desc}" if desc else ""))
-            if skill_prompts:
-                system_prompt += "\n\n📋 你拥有以下技能能力：\n" + "\n".join(skill_summary_list)
-                system_prompt += "\n\n📝 各技能详细行为定义：\n" + "\n".join(skill_prompts)
-                system_prompt += "\n\n当用户询问\"你有什么能力\"、\"你会什么\"、\"你的技能\"等问题时，请列出上述技能名称及其简要说明。"
-                system_prompt += "\n当用户的问题匹配某个技能时，请使用该技能定义的角色和能力来回答。"
+        # 使用共享函数构建 system prompt（身份 + 角色设定 + 技能注入）
+        system_prompt = build_employee_system_prompt(dict(employee))
 
         self.set_header("Content-Type", "text/event-stream")
         self.set_header("Cache-Control", "no-cache")

@@ -13,9 +13,12 @@ from app.models.db import get_connection
 try:
     from app.models.digital_employee import DigitalEmployeeRepository
     from app.models.ai_skill import AiSkillRepository
+    from app.controllers.digital_employee import build_employee_system_prompt, _resolve_skill_ids
 except ImportError:
     DigitalEmployeeRepository = None
     AiSkillRepository = None
+    build_employee_system_prompt = None
+    _resolve_skill_ids = None
 
 # 技能调度系统导入
 from app.services.skill_scheduler import (
@@ -467,9 +470,9 @@ def _get_available_employees() -> list:
                     skills = []
                 employees.append({
                     "name": emp_dict.get("name", ""),
-                    "trigger": emp_dict.get("trigger_word", emp_dict.get("name", "").lower()),
+                    "trigger": (emp_dict.get("name") or "").lower(),
                     "avatar": emp_dict.get("avatar", ""),
-                    "role": emp_dict.get("role_desc", ""),
+                    "role": emp_dict.get("role_name", ""),
                     "skills": skills,
                     "status": emp_dict.get("status", "enabled"),
                 })
@@ -649,11 +652,11 @@ def _lookup_employee(skill_name: str) -> dict:
             employees = DigitalEmployeeRepository.get_all(enabled_only=True)
             for emp in employees:
                 emp_dict = dict(emp) if hasattr(emp, 'keys') else emp
-                if skill_lower in (emp_dict.get("name", "").lower(), emp_dict.get("trigger_word", "").lower()):
+                if skill_lower == (emp_dict.get("name") or "").lower():
                     return {
                         "display_name": emp_dict.get("name", skill_name),
                         "avatar": emp_dict.get("avatar", ""),
-                        "role": emp_dict.get("role_desc", ""),
+                        "role": emp_dict.get("role_name", ""),
                     }
         except Exception:
             pass
@@ -782,115 +785,47 @@ def _build_report_prompt(data: dict) -> str:
 
 
 def _get_skill_prompt(skill_name: str, skill_args: str) -> tuple:
-    """根据数字员工技能名称，返回对应的系统提示词。
-    优先从数据库查询数字员工和技能配置。
+    """根据技能名称，返回对应的系统提示词。
+    优先从数字员工表匹配 → 技能表匹配 → 硬编码回退。
     返回 (prompt, display_name)"""
 
-    # 1. 从数据库查找匹配的数字员工
-    if DigitalEmployeeRepository:
+    # 1. 从数据库查找匹配的数字员工（使用共享函数构建 prompt）
+    if DigitalEmployeeRepository and build_employee_system_prompt:
         try:
             employees = DigitalEmployeeRepository.get_all(enabled_only=True)
             for emp in employees:
                 emp_dict = dict(emp) if hasattr(emp, 'keys') else emp
-                emp_name = emp_dict.get("name", "").lower()
-                trigger = emp_dict.get("trigger_word", "").lower()
-                # 匹配名称或触发词
-                if skill_name in (emp_name, trigger):
-                    # 获取绑定的技能 Prompt
-                    skills_json = emp_dict.get("skills", "[]")
-                    try:
-                        bound_skills = json.loads(skills_json) if isinstance(skills_json, str) else skills_json
-                    except (json.JSONDecodeError, TypeError):
-                        bound_skills = []
-                    # 查找技能详细 Prompt
-                    skill_prompt_text = ""
-                    if AiSkillRepository and bound_skills:
-                        for sid in bound_skills:
-                            try:
-                                skill = AiSkillRepository.get_by_id(int(sid))
-                                if skill:
-                                    skill_prompt_text += f"\n【技能：{skill['name']}】{skill.get('prompt_template', '')}"
-                            except (ValueError, Exception):
-                                pass
-
-                    welcome = emp_dict.get("welcome_message", "")
-                    role = emp_dict.get("role_desc", "")
-                    system_prompt = (
-                        f"你是 {emp_dict.get('name', skill_name)}，一个 AI 数字员工。\n"
-                        f"角色定位：{role}\n"
-                    )
-                    if welcome:
-                        system_prompt += f"欢迎语风格参考：{welcome}\n"
-                    if skill_prompt_text:
-                        system_prompt += f"能力范围：{skill_prompt_text}\n"
-                    system_prompt += f"\n用户对你说：{skill_args}\n"
-                    system_prompt += f"请以「{emp_dict.get('name', skill_name)}」的身份和风格回复，保持友好、专业。"
-                    return system_prompt, emp_dict.get("name", skill_name)
+                emp_name = (emp_dict.get("name") or "").lower()
+                # 按名称匹配
+                if skill_name == emp_name:
+                    prompt = build_employee_system_prompt(emp_dict)
+                    display = emp_dict.get("name", skill_name)
+                    return prompt, display
         except Exception:
             pass
 
-    # 2. 从数据库查找匹配的技能（AiSkill）
+    # 2. 从数据库查找匹配的技能（AiSkill 单技能匹配）
     if AiSkillRepository:
         try:
             all_skills = AiSkillRepository.get_all(enabled_only=True)
             for sk in all_skills:
                 sk_dict = dict(sk) if hasattr(sk, 'keys') else sk
                 sk_name = sk_dict.get("name", "").lower()
-                keywords = sk_dict.get("trigger_keywords", "")
-                # 匹配技能名称或触发关键词
-                if skill_name == sk_name or skill_name in (keywords or "").split(","):
-                    prompt = sk_dict.get("prompt_template", "")
-                    system_prompt = (
+                if skill_name == sk_name:
+                    prompt = (
                         f"你是 {sk_dict.get('name', skill_name)} 数字员工。\n"
                         f"技能描述：{sk_dict.get('description', '')}\n"
-                        f"{prompt}\n\n"
-                        f"用户输入：{skill_args}\n"
+                        f"{sk_dict.get('prompt_template', '')}\n\n"
                     )
-                    return system_prompt, sk_dict.get("name", skill_name)
+                    return prompt, sk_dict.get("name", skill_name)
         except Exception:
             pass
 
-    # 3. 回退：内置硬编码技能
+    # 3. 回退：内置硬编码技能（search / help / 通用兜底）
     skill_prompts = {
-        "天气": (
-            "你是一个天气查询数字员工。用户询问天气情况。\n"
-            "请根据你的知识回答天气相关问题，包括温度、湿度、风力、穿衣建议等。\n"
-            f"用户查询：{skill_args}\n"
-            "请用友好、专业的语气回答。"
-        ),
-        "音乐": (
-            "你是一个音乐推荐数字员工。用户询问音乐相关的内容。\n"
-            "请根据你的知识推荐歌曲、专辑、歌手，介绍音乐风格、背景等。\n"
-            f"用户需求：{skill_args}\n"
-            "请用热情、有品味的语气回答。"
-        ),
-        "西师妹": (
-            "你是【西师妹】，IOIQ 平台的核心 AI 数字员工，一个充满活力、专业又讨人喜欢的伙伴。\n\n"
-            "## 角色身份\n"
-            "- 姓名：西师妹（Xi Shimei）\n"
-            "- 定位：IOIQ 智能问数平台的 AI 伙伴、技术顾问、数据分析师\n"
-            "- 性格：活泼开朗、幽默风趣、善解人意\n"
-            "- 口头禅：\"让我帮你看看数据~\" \"这可难不倒我！\" \"数据说了算~\"\n\n"
-            "## 专业能力\n"
-            "- Python 编程与数据分析专家\n"
-            "- 数据库查询与 SQL 优化\n"
-            "- AI/机器学习技术科普\n"
-            "- 系统运维与架构指导\n"
-            "- 业务报表解读与数据可视化\n"
-            "- 代码调试与性能优化\n\n"
-            "## 交流风格\n"
-            "- 使用轻松俏皮的语气，偶尔用颜文字 (^_^) 或表情符号\n"
-            "- 专业问题要认真但不死板，善用比喻帮助理解\n"
-            "- 遇到不会的问题诚实说「这个我还需要学习一下~」\n"
-            "- 主动提供下一步建议，像朋友一样关心用户进度\n"
-            "- 回复末尾可以加一句鼓励或关心的问候\n\n"
-            f"用户对你说：{skill_args}\n\n"
-            "请以「西师妹」的身份回复，保持活泼友好又专业。"
-        ),
         "search": (
             "你是一个网络搜索数字员工。用户需要搜索互联网上的信息。\n"
             "请根据你的知识库尽力提供最新、最相关的信息，并给出参考来源的建议。\n"
-            f"搜索内容：{skill_args}\n"
             "请用条理清晰的方式组织回复，分点列出关键信息。"
         ),
         "help": (
